@@ -13,14 +13,14 @@ param appServiceSku string
 @description('App Insights connection string')
 param appInsightsConnectionString string
 
-@description('Storage account name used for noise log blobs')
+@description('Storage account name for blob storage')
 param storageAccountName string
 
-@description('Storage container name used for noise log blobs')
-param logsContainerName string
+@description('Azure AI project endpoint')
+param aiProjectEndpoint string
 
-@description('Folder path for local JSON persistence')
-param localDataFolder string = '/home/site/data'
+@description('Primary AI model deployment name')
+param primaryModelDeploymentName string
 
 resource appServicePlan 'Microsoft.Web/serverfarms@2023-12-01' = {
   name: appServicePlanName
@@ -60,20 +60,20 @@ resource webApp 'Microsoft.Web/sites@2023-12-01' = {
           value: '1'
         }
         {
-          name: 'NoiseStorage__AccountUrl'
+          name: 'AZURE_AI_PROJECT_ENDPOINT'
+          value: aiProjectEndpoint
+        }
+        {
+          name: 'AZURE_AI_MODEL_DEPLOYMENT_NAME'
+          value: primaryModelDeploymentName
+        }
+        {
+          name: 'AZURE_STORAGE_ACCOUNT_NAME'
+          value: storageAccountName
+        }
+        {
+          name: 'AZURE_STORAGE_ACCOUNT_URL'
           value: 'https://${storageAccountName}.blob.${environment().suffixes.storage}'
-        }
-        {
-          name: 'NoiseStorage__ContainerName'
-          value: logsContainerName
-        }
-        {
-          name: 'NoiseStorage__TenantId'
-          value: subscription().tenantId
-        }
-        {
-          name: 'LocalData__FolderPath'
-          value: localDataFolder
         }
       ]
     }
@@ -82,4 +82,5 @@ resource webApp 'Microsoft.Web/sites@2023-12-01' = {
 }
 
 output webAppName string = webApp.name
+output webAppUrl string = 'https://${webApp.properties.defaultHostName}'
 output principalId string = webApp.identity.principalId

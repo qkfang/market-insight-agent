@@ -29,7 +29,7 @@ public sealed class FabricLakehouseService
     {
         if (string.IsNullOrWhiteSpace(_workspaceId) || string.IsNullOrWhiteSpace(_lakehouseId))
         {
-            _logger.LogInformation("Fabric workspace/lakehouse config is not set; skipping OneLake write for {Path}.", relativePath);
+            _logger.LogInformation("Fabric workspace/lakehouse config is not set; skipping OneLake write for {Path}.", Sanitize(relativePath));
             return false;
         }
 
@@ -52,7 +52,7 @@ public sealed class FabricLakehouseService
             var createResponse = await client.SendAsync(createRequest);
             if (!createResponse.IsSuccessStatusCode)
             {
-                _logger.LogWarning("Failed to create OneLake file {Path}: {Status}", safePath, (int)createResponse.StatusCode);
+                _logger.LogWarning("Failed to create OneLake file {Path}: {Status}", Sanitize(safePath), (int)createResponse.StatusCode);
                 return false;
             }
 
@@ -64,7 +64,7 @@ public sealed class FabricLakehouseService
             var appendResponse = await client.SendAsync(appendRequest);
             if (!appendResponse.IsSuccessStatusCode)
             {
-                _logger.LogWarning("Failed to append OneLake file {Path}: {Status}", safePath, (int)appendResponse.StatusCode);
+                _logger.LogWarning("Failed to append OneLake file {Path}: {Status}", Sanitize(safePath), (int)appendResponse.StatusCode);
                 return false;
             }
 
@@ -73,7 +73,7 @@ public sealed class FabricLakehouseService
             var flushResponse = await client.SendAsync(flushRequest);
             if (!flushResponse.IsSuccessStatusCode)
             {
-                _logger.LogWarning("Failed to flush OneLake file {Path}: {Status}", safePath, (int)flushResponse.StatusCode);
+                _logger.LogWarning("Failed to flush OneLake file {Path}: {Status}", Sanitize(safePath), (int)flushResponse.StatusCode);
                 return false;
             }
 
@@ -81,10 +81,13 @@ public sealed class FabricLakehouseService
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "Failed to write file to Fabric lakehouse: {Path}", relativePath);
+            _logger.LogWarning(ex, "Failed to write file to Fabric lakehouse: {Path}", Sanitize(relativePath));
             return false;
         }
     }
+
+    private static string Sanitize(string value) =>
+        (value ?? string.Empty).Replace('\r', ' ').Replace('\n', ' ');
 
     public async Task<object> QueryStatusAsync()
     {

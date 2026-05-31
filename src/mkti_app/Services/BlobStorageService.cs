@@ -31,7 +31,7 @@ public sealed class BlobStorageService
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "Falling back to local storage for write to {Container}/{Blob}", containerName, blobName);
+            _logger.LogWarning(ex, "Falling back to local storage for write to {Container}/{Blob}", Sanitize(containerName), Sanitize(blobName));
             var fullPath = GetFallbackPath(containerName, blobName);
             Directory.CreateDirectory(Path.GetDirectoryName(fullPath)!);
             await File.WriteAllTextAsync(fullPath, content);
@@ -52,7 +52,7 @@ public sealed class BlobStorageService
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "Falling back to local storage for read from {Container}/{Blob}", containerName, blobName);
+            _logger.LogWarning(ex, "Falling back to local storage for read from {Container}/{Blob}", Sanitize(containerName), Sanitize(blobName));
             var fullPath = GetFallbackPath(containerName, blobName);
             return File.Exists(fullPath) ? await File.ReadAllTextAsync(fullPath) : null;
         }
@@ -72,7 +72,7 @@ public sealed class BlobStorageService
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "Falling back to local storage for byte read from {Container}/{Blob}", containerName, blobName);
+            _logger.LogWarning(ex, "Falling back to local storage for byte read from {Container}/{Blob}", Sanitize(containerName), Sanitize(blobName));
             var fullPath = GetFallbackPath(containerName, blobName);
             return File.Exists(fullPath) ? await File.ReadAllBytesAsync(fullPath) : null;
         }
@@ -88,7 +88,7 @@ public sealed class BlobStorageService
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "Falling back to local storage for exists check on {Container}/{Blob}", containerName, blobName);
+            _logger.LogWarning(ex, "Falling back to local storage for exists check on {Container}/{Blob}", Sanitize(containerName), Sanitize(blobName));
             return File.Exists(GetFallbackPath(containerName, blobName));
         }
     }
@@ -110,7 +110,7 @@ public sealed class BlobStorageService
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "Falling back to local storage for blob listing of {Container}", containerName);
+            _logger.LogWarning(ex, "Falling back to local storage for blob listing of {Container}", Sanitize(containerName));
             var folder = Path.Combine(_fallbackRoot, containerName);
             if (!Directory.Exists(folder))
                 return [];
@@ -150,7 +150,7 @@ public sealed class BlobStorageService
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "Falling back to local storage for latest read from {Container}", containerName);
+            _logger.LogWarning(ex, "Falling back to local storage for latest read from {Container}", Sanitize(containerName));
             var folder = Path.Combine(_fallbackRoot, containerName);
             if (!Directory.Exists(folder))
                 return null;
@@ -162,6 +162,9 @@ public sealed class BlobStorageService
             return latestFile == null ? null : await File.ReadAllTextAsync(latestFile);
         }
     }
+
+    private static string Sanitize(string value) =>
+        (value ?? string.Empty).Replace('\r', ' ').Replace('\n', ' ');
 
     private string GetFallbackPath(string containerName, string blobName)
     {

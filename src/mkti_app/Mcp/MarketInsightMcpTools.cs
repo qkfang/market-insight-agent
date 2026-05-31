@@ -12,6 +12,8 @@ public sealed class MarketInsightMcpTools
 {
     private const string NewsStoreContainer = "news-store";
     private const string NewsAnalysisContainer = "news-analysis";
+    private const string MarketInsightContainer = "market-insight";
+    private const string MarketResearchContainer = "market-research";
 
     private static readonly JsonSerializerOptions JsonOptions = new() { WriteIndented = false };
 
@@ -346,23 +348,124 @@ public sealed class MarketInsightMcpTools
         return builder.ToString().Trim();
     }
 
-    [McpServerTool(Name = "store_insight"), Description("Write daily market insight markdown into blob container market-insight.")]
-    public async Task<string> StoreInsight(
-        [Description("Markdown content for the insight document")] string markdown,
-        [Description("Optional blob name. Defaults to UTC-date markdown name.")] string? blobName = null)
+    [McpServerTool(Name = "get_latest_research"), Description("Read the most recent copper market research result produced by the Market Research Agent from the market-research blob container. Returns JSON with sentiment, confidence, keyDrivers, summary and timestamp when available, otherwise the raw research markdown as summary.")]
+    public async Task<string> GetLatestResearch()
     {
-        var finalName = string.IsNullOrWhiteSpace(blobName)
-            ? $"insight-{DateTime.UtcNow:yyyy-MM-dd}.md"
-            : blobName;
+        var names = await _blobStorageService.ListBlobNamesAsync(MarketResearchContainer);
+        var latest = names.OrderByDescending(n => n, StringComparer.Ordinal).FirstOrDefault();
+        if (latest is null)
+        {
+            return JsonSerializer.Serialize(new
+            {
+                sentiment = (string?)null,
+                confidence = (double?)null,
+                keyDrivers = Array.Empty<string>(),
+                summary = string.Empty,
+                timestamp = (string?)null
+            }, JsonOptions);
+        }
 
-        await _blobStorageService.WriteTextAsync("market-insight", finalName, markdown ?? string.Empty);
-        return $"Stored insight as {finalName}";
+        var content = await _blobStorageService.ReadTextAsync(MarketResearchContainer, latest) ?? string.Empty;
+
+        // If the stored research is already structured JSON, return it untouched.
+        if (LooksLikeJsonObject(content))
+            return content;
+
+        return JsonSerializer.Serialize(new
+        {
+            sentiment = (string?)null,
+            confidence = (double?)null,
+            keyDrivers = Array.Empty<string>(),
+            summary = content,
+            timestamp = ExtractDateFromName(latest)
+        }, JsonOptions);
     }
 
-    [McpServerTool(Name = "read_latest_insight"), Description("Read the latest stored insight markdown from blob container market-insight.")]
-    public async Task<string> ReadLatestInsight()
+    [McpServerTool(Name = "store_market_insight"), Description("Store the daily copper market insight markdown to the market-insight blob container as {date}_copper_insight.md and to the Fabric Lakehouse market_insight/ folder. Returns JSON with the blob URL, filename and date.")]
+    public async Task<string> StoreMarketInsight(
+        [Description("Insight report content as markdown")] string content,
+        [Description("Report date in yyyy-MM-dd format. Defaults to today's UTC date when omitted.")] string? date = null)
     {
-        return await _blobStorageService.ReadLatestTextAsync("market-insight") ?? string.Empty;
+        var resolvedDate = string.IsNullOrWhiteSpace(date)
+            ? DateTime.UtcNow.ToString("yyyy-MM-dd")
+            : date.Trim();
+        var filename = $"{resolvedDate}_copper_insight.md";
+        var safeContent = content ?? string.Empty;
+
+        await _blobStorageService.WriteTextAsync(MarketInsightContainer, filename, safeContent, "text/markdown");
+        await _fabricLakehouseService.WriteFileAsync($"market_insight/{filename}", safeContent);
+
+        return JsonSerializer.Serialize(new
+        {
+            blobUrl = _blobStorageService.GetBlobUrl(MarketInsightContainer, filename),
+            filename,
+            date = resolvedDate
+        }, JsonOptions);
+    }
+
+    [McpServerTool(Name = "get_latest_insight"), Description("Read the most recent insight markdown from the market-insight blob container. Returns JSON with date, content and filename.")]
+    public async Task<string> GetLatestInsight()
+    {
+        var names = await _blobStorageService.ListBlobNamesAsync(MarketInsightContainer);
+        var latest = names.OrderByDescending(n => n, StringComparer.Ordinal).FirstOrDefault();
+        if (latest is null)
+            return JsonSerializer.Serialize(new { date = string.Empty, content = string.Empty, filename = string.Empty }, JsonOptions);
+
+        var content = await _blobStorageService.ReadTextAsync(MarketInsightContainer, latest) ?? string.Empty;
+        return JsonSerializer.Serialize(new
+        {
+            date = ExtractDateFromName(latest) ?? string.Empty,
+            content,
+            filename = latest
+        }, JsonOptions);
+    }
+
+    [McpServerTool(Name = "get_insight_by_date"), Description("Read the copper market insight for a specific date from the market-insight blob container. Returns JSON with date, content and filename.")]
+    public async Task<string> GetInsightByDate(
+        [Description("Report date in yyyy-MM-dd format")] string date)
+    {
+        if (string.IsNullOrWhiteSpace(date))
+            return "Error: date is required.";
+
+        var filename = $"{date.Trim()}_copper_insight.md";
+        var content = await _blobStorageService.ReadTextAsync(MarketInsightContainer, filename);
+
+        if (content is null)
+        {
+            // Fall back to any blob that starts with the requested date.
+            var names = await _blobStorageService.ListBlobNamesAsync(MarketInsightContainer);
+            var match = names.FirstOrDefault(n => n.StartsWith(date.Trim(), StringComparison.OrdinalIgnoreCase));
+            if (match is not null)
+            {
+                filename = match;
+                content = await _blobStorageService.ReadTextAsync(MarketInsightContainer, match);
+            }
+        }
+
+        return JsonSerializer.Serialize(new
+        {
+            date = date.Trim(),
+            content = content ?? string.Empty,
+            filename = content is null ? string.Empty : filename
+        }, JsonOptions);
+    }
+
+    private static bool LooksLikeJsonObject(string content)
+    {
+        if (string.IsNullOrWhiteSpace(content))
+            return false;
+        var trimmed = content.TrimStart();
+        return trimmed.StartsWith('{') || trimmed.StartsWith('[');
+    }
+
+    private static string? ExtractDateFromName(string filename)
+    {
+        if (string.IsNullOrWhiteSpace(filename))
+            return null;
+        var name = Path.GetFileName(filename);
+        var token = name.Split('_', '.').FirstOrDefault();
+        return DateTime.TryParseExact(token, "yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture,
+            System.Globalization.DateTimeStyles.None, out _) ? token : null;
     }
 
     private HttpClient CreateClient()

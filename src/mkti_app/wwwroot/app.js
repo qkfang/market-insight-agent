@@ -277,58 +277,180 @@ async function renderTab(key) {
   if (key === 'ingest') return renderIngestTab();
   if (key === 'analyze') return renderAnalyzeTab();
   if (key === 'research') return renderResearchTab();
-  if (key === 'generate') return addActionTab(key, 'Insight Generation', '/api/insight/generate');
+  if (key === 'generate') return renderGenerateTab();
+  if (key === 'subscription') return renderSubscriptionTab();
+  if (key === 'delivery') return renderDeliveryTab();
+}
 
-  if (key === 'subscription') {
-    const markets = ['Copper', 'Aluminum', 'Nickel'];
-    const items = ['DailyInsight', 'WeeklyTrend', 'RiskAlert'];
-    contentEl.innerHTML = `
-      <h2>Subscription</h2>
-      <div><strong>Markets</strong>${markets.map(m => `<label><input type="checkbox" name="market" value="${m}"> ${m}</label>`).join('')}</div>
-      <div><strong>Items</strong>${items.map(i => `<label><input type="checkbox" name="item" value="${i}"> ${i}</label>`).join('')}</div>
-      <button class="action">Save</button>
-      <pre id="result">Ready</pre>`;
+function renderGenerateTab() {
+  contentEl.innerHTML = `
+    <h2>Insight Generation</h2>
+    <p>Generate today's copper market insight report. This may take 30-60 seconds.</p>
+    <button class="action" id="generate-btn">Generate Today's Insight</button>
+    <span id="generate-spinner" class="spinner" hidden></span>
+    <div id="generate-summary"></div>
+    <h3>Preview</h3>
+    <pre id="generate-preview">No report generated yet.</pre>
+    <div id="generate-link"></div>`;
 
+  const btn = document.getElementById('generate-btn');
+  const spinner = document.getElementById('generate-spinner');
+  const summary = document.getElementById('generate-summary');
+  const preview = document.getElementById('generate-preview');
+  const link = document.getElementById('generate-link');
+
+  btn.onclick = async () => {
+    btn.disabled = true;
+    spinner.hidden = false;
+    summary.textContent = '';
+    link.innerHTML = '';
+    preview.textContent = 'Generating insight report... this may take 30-60 seconds.';
     try {
-      const subscriptionResponse = await fetch('/api/subscription');
-      if (!subscriptionResponse.ok) throw new Error(`HTTP ${subscriptionResponse.status}`);
-      const current = await subscriptionResponse.json();
-      const parsed = JSON.parse(current.subscription || '{}');
-      document.querySelectorAll('input[name="market"]').forEach(c => c.checked = (parsed.markets || []).includes(c.value));
-      document.querySelectorAll('input[name="item"]').forEach(c => c.checked = (parsed.items || []).includes(c.value));
-    } catch {}
+      const response = await fetch('/api/insight/generate');
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      const json = await response.json();
+      if (!json.success) throw new Error(json.error || 'Generation failed.');
+      summary.innerHTML = `<strong>Success:</strong> stored as ${escapeHtml(json.filename || '')} (${escapeHtml(json.date || '')}).`;
+      preview.textContent = json.preview || '(empty report)';
+      const fullLink = document.createElement('button');
+      fullLink.className = 'action';
+      fullLink.textContent = 'View Full Report';
+      fullLink.onclick = () => setTab('delivery');
+      link.appendChild(fullLink);
+    } catch (e) {
+      summary.innerHTML = `<strong>Error:</strong> ${escapeHtml(e.message)}`;
+      preview.textContent = `Error: ${e.message}`;
+    } finally {
+      btn.disabled = false;
+      spinner.hidden = true;
+    }
+  };
+}
 
-    contentEl.querySelector('button').onclick = async () => {
-      const selectedMarkets = [...document.querySelectorAll('input[name="market"]:checked')].map(x => x.value);
-      const selectedItems = [...document.querySelectorAll('input[name="item"]:checked')].map(x => x.value);
-      const pre = document.getElementById('result');
-      pre.textContent = 'Saving...';
-      try {
-        const response = await fetch('/api/subscription', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ markets: selectedMarkets, items: selectedItems })
-        });
-        if (!response.ok) throw new Error(`HTTP ${response.status}`);
-        pre.textContent = JSON.stringify(await response.json(), null, 2);
-      } catch (e) {
-        pre.textContent = `Error: ${e.message}`;
-      }
-    };
-    return;
+async function renderSubscriptionTab() {
+  const markets = ['Copper', 'Gold', 'Silver', 'Aluminum'];
+  const items = ['Daily Report', 'Sentiment Alert', 'Price Alert'];
+  contentEl.innerHTML = `
+    <h2>Insight Subscription</h2>
+    <div><strong>Markets</strong>${markets.map(m => `<label><input type="checkbox" name="market" value="${escapeHtml(m)}"> ${escapeHtml(m)}</label>`).join('')}</div>
+    <div><strong>Items</strong>${items.map(i => `<label><input type="checkbox" name="item" value="${escapeHtml(i)}"> ${escapeHtml(i)}</label>`).join('')}</div>
+    <button class="action" id="subscription-save">Save Preferences</button>
+    <pre id="result">Ready</pre>`;
+
+  try {
+    const subscriptionResponse = await fetch('/api/subscription');
+    if (!subscriptionResponse.ok) throw new Error(`HTTP ${subscriptionResponse.status}`);
+    const current = await subscriptionResponse.json();
+    const selMarkets = current.markets || [];
+    const selItems = current.items || [];
+    document.querySelectorAll('input[name="market"]').forEach(c => c.checked = selMarkets.includes(c.value));
+    document.querySelectorAll('input[name="item"]').forEach(c => c.checked = selItems.includes(c.value));
+  } catch {}
+
+  document.getElementById('subscription-save').onclick = async () => {
+    const selectedMarkets = [...document.querySelectorAll('input[name="market"]:checked')].map(x => x.value);
+    const selectedItems = [...document.querySelectorAll('input[name="item"]:checked')].map(x => x.value);
+    const pre = document.getElementById('result');
+    pre.textContent = 'Saving...';
+    try {
+      const response = await fetch('/api/subscription', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ markets: selectedMarkets, items: selectedItems })
+      });
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      const json = await response.json();
+      pre.textContent = json.success ? 'Preferences saved.' : JSON.stringify(json, null, 2);
+    } catch (e) {
+      pre.textContent = `Error: ${e.message}`;
+    }
+  };
+}
+
+function loadMarked() {
+  return new Promise((resolve) => {
+    if (window.marked) return resolve(true);
+    const script = document.createElement('script');
+    script.src = 'https://cdn.jsdelivr.net/npm/marked/marked.min.js';
+    script.onload = () => resolve(true);
+    script.onerror = () => resolve(false);
+    document.head.appendChild(script);
+  });
+}
+
+function renderMarkdown(targetEl, markdown) {
+  if (window.marked && typeof window.marked.parse === 'function') {
+    targetEl.innerHTML = window.marked.parse(markdown || '');
+  } else {
+    targetEl.innerHTML = `<pre>${escapeHtml(markdown || '')}</pre>`;
+  }
+}
+
+async function renderDeliveryTab() {
+  contentEl.innerHTML = `
+    <h2>Insight Delivery</h2>
+    <div id="delivery-controls">
+      <label>Previous Reports:
+        <select id="delivery-select"><option value="">Latest</option></select>
+      </label>
+      <span id="delivery-date"></span>
+    </div>
+    <article id="delivery-content" class="markdown">Loading...</article>`;
+
+  await loadMarked();
+
+  const select = document.getElementById('delivery-select');
+  const dateEl = document.getElementById('delivery-date');
+  const contentDiv = document.getElementById('delivery-content');
+
+  async function showInsight(payload) {
+    if (!payload || !payload.content) {
+      contentDiv.innerHTML = '<p>No insight available.</p>';
+      dateEl.textContent = '';
+      return;
+    }
+    dateEl.textContent = payload.date ? `Report date: ${payload.date}` : '';
+    renderMarkdown(contentDiv, payload.content);
   }
 
-  if (key === 'delivery') {
-    contentEl.innerHTML = '<h2>Insight Delivery</h2><pre id="result">Loading...</pre>';
+  async function loadLatest() {
     try {
-      const insightResponse = await fetch('/api/insight/latest');
-      if (!insightResponse.ok) throw new Error(`HTTP ${insightResponse.status}`);
-      const data = await insightResponse.json();
-      document.getElementById('result').textContent = data.insight || 'No insight available.';
+      const response = await fetch('/api/insight/latest');
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      await showInsight(await response.json());
     } catch (e) {
-      document.getElementById('result').textContent = `Error: ${e.message}`;
+      contentDiv.innerHTML = `Error: ${escapeHtml(e.message)}`;
     }
   }
+
+  async function loadByDate(date) {
+    if (!date) return loadLatest();
+    try {
+      const response = await fetch(`/api/insight/byDate?date=${encodeURIComponent(date)}`);
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      await showInsight(await response.json());
+    } catch (e) {
+      contentDiv.innerHTML = `Error: ${escapeHtml(e.message)}`;
+    }
+  }
+
+  try {
+    const listResponse = await fetch('/api/insight/list');
+    if (listResponse.ok) {
+      const listJson = await listResponse.json();
+      (listJson.reports || []).forEach(r => {
+        if (!r.date) return;
+        const option = document.createElement('option');
+        option.value = r.date;
+        option.textContent = r.date;
+        select.appendChild(option);
+      });
+    }
+  } catch {}
+
+  select.onchange = () => loadByDate(select.value);
+
+  await loadLatest();
 }
 
 for (const tab of tabs) {

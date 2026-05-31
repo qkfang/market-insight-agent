@@ -130,11 +130,27 @@ public static class Apis
         {
             try
             {
-                var result = await marketResearchAgent.RunAsync("Research the current copper market and summarize sentiment, drivers, and risks.");
+                var result = await marketResearchAgent.RunAsync(
+                    "Research the current copper market sentiment based on latest news and Bing search results");
+
+                var (sentiment, confidence, keyDrivers, summary) = ParseSentiment(result);
+                var timestamp = DateTime.UtcNow.ToString("o");
+
                 var researchDate = DateTime.UtcNow.ToString("yyyy-MM-dd");
-                await blobStorageService.WriteTextAsync("market-research", $"{researchDate}_copper_research.md", result, "text/markdown");
-                var lakehouse = await fabricLakehouseService.QueryStatusAsync();
-                return Results.Json(new { status = "ok", result, lakehouse });
+                var researchJson = System.Text.Json.JsonSerializer.Serialize(
+                    new { sentiment, confidence, keyDrivers, summary, timestamp });
+                await blobStorageService.WriteTextAsync(
+                    "market-research", $"{researchDate}_copper_research.json", researchJson, "application/json");
+
+                return Results.Json(new
+                {
+                    status = "ok",
+                    sentiment,
+                    confidence,
+                    keyDrivers,
+                    summary,
+                    timestamp
+                });
             }
             catch (Exception ex)
             {
@@ -249,6 +265,74 @@ public static class Apis
         }
         catch (System.Text.Json.JsonException) { }
         return null;
+    }
+    private static (string sentiment, double confidence, string[] keyDrivers, string summary) ParseSentiment(string? agentOutput)
+    {
+        var sentiment = "neutral";
+        var confidence = 0.0;
+        var keyDrivers = Array.Empty<string>();
+        var summary = agentOutput ?? string.Empty;
+
+        var json = ExtractJsonObject(agentOutput);
+        if (json is null)
+            return (sentiment, confidence, keyDrivers, summary);
+
+        try
+        {
+            using var doc = System.Text.Json.JsonDocument.Parse(json);
+            var root = doc.RootElement;
+
+            if (root.TryGetProperty("sentiment", out var s) && s.ValueKind == System.Text.Json.JsonValueKind.String)
+            {
+                var value = s.GetString();
+                if (!string.IsNullOrWhiteSpace(value))
+                    sentiment = value.Trim().ToLowerInvariant();
+            }
+
+            if (root.TryGetProperty("confidence", out var c))
+            {
+                if (c.ValueKind == System.Text.Json.JsonValueKind.Number && c.TryGetDouble(out var cv))
+                    confidence = cv;
+                else if (c.ValueKind == System.Text.Json.JsonValueKind.String
+                    && double.TryParse(c.GetString(), System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out var cs))
+                    confidence = cs;
+            }
+
+            if (root.TryGetProperty("keyDrivers", out var k) && k.ValueKind == System.Text.Json.JsonValueKind.Array)
+            {
+                keyDrivers = k.EnumerateArray()
+                    .Select(e => e.ValueKind == System.Text.Json.JsonValueKind.String ? e.GetString() : e.ToString())
+                    .Where(v => !string.IsNullOrWhiteSpace(v))
+                    .Select(v => v!)
+                    .ToArray();
+            }
+
+            if (root.TryGetProperty("summary", out var sum) && sum.ValueKind == System.Text.Json.JsonValueKind.String)
+            {
+                var value = sum.GetString();
+                if (!string.IsNullOrWhiteSpace(value))
+                    summary = value;
+            }
+        }
+        catch (System.Text.Json.JsonException)
+        {
+            // Fall back to defaults / raw output if the agent did not return valid JSON.
+        }
+
+        return (sentiment, confidence, keyDrivers, summary);
+    }
+
+    private static string? ExtractJsonObject(string? text)
+    {
+        if (string.IsNullOrWhiteSpace(text))
+            return null;
+
+        var start = text.IndexOf('{');
+        var end = text.LastIndexOf('}');
+        if (start < 0 || end <= start)
+            return null;
+
+        return text.Substring(start, end - start + 1);
     }
 }
 

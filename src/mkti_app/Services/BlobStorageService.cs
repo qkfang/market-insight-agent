@@ -126,6 +126,42 @@ public sealed class BlobStorageService
         }
     }
 
+    public async Task<IReadOnlyList<string>> ListRecentBlobNamesAsync(string containerName, int count)
+    {
+        var take = count <= 0 ? 10 : count;
+        try
+        {
+            var container = _blobServiceClient.GetBlobContainerClient(containerName);
+            if (!await container.ExistsAsync())
+                return [];
+
+            var items = new List<Azure.Storage.Blobs.Models.BlobItem>();
+            await foreach (var blobItem in container.GetBlobsAsync())
+            {
+                items.Add(blobItem);
+            }
+
+            return items
+                .OrderByDescending(b => b.Properties.LastModified ?? DateTimeOffset.MinValue)
+                .Take(take)
+                .Select(b => b.Name)
+                .ToArray();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Falling back to local storage for recent blob listing of {Container}", Sanitize(containerName));
+            var folder = Path.Combine(_fallbackRoot, containerName);
+            if (!Directory.Exists(folder))
+                return [];
+
+            return Directory.EnumerateFiles(folder, "*", SearchOption.AllDirectories)
+                .OrderByDescending(File.GetLastWriteTimeUtc)
+                .Take(take)
+                .Select(path => Path.GetRelativePath(folder, path).Replace('\\', '/'))
+                .ToArray();
+        }
+    }
+
     public string GetBlobUrl(string containerName, string blobName)
     {
         var container = _blobServiceClient.GetBlobContainerClient(containerName);

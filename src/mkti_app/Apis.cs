@@ -18,13 +18,31 @@ public static class Apis
         {
             try
             {
-                var result = await newsIngestionAgent.RunAsync("Ingest latest copper market news and store source documents.");
-                return Results.Json(new { status = "ok", result });
+                var before = await blobStorageService.ListBlobNamesAsync("news-store");
+                var result = await newsIngestionAgent.RunAsync("Download latest copper market news from RSS feeds and store them");
+                var after = await blobStorageService.ListBlobNamesAsync("news-store");
+
+                var delta = after.Count - before.Count;
+                var articlesStored = delta >= 0 ? delta : after.Count;
+
+                return Results.Json(new
+                {
+                    success = true,
+                    articlesStored,
+                    filenames = after,
+                    message = result
+                });
             }
             catch (Exception ex)
             {
-                return Results.Json(new { status = "error", error = ex.Message });
+                return Results.Json(new { success = false, articlesStored = 0, message = ex.Message });
             }
+        });
+
+        app.MapGet("/api/news/list", async () =>
+        {
+            var filenames = await blobStorageService.ListBlobNamesAsync("news-store");
+            return Results.Json(new { success = true, filenames });
         });
 
         app.MapGet("/api/news/analyze", async () =>

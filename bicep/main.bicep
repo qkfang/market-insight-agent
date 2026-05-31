@@ -9,17 +9,8 @@ param baseName string
 @description('Full project name used for Foundry and Fabric resources')
 param projectName string = 'market_insight'
 
-@description('SKU for App Service plan')
-@allowed([
-  'F1'
-  'B1'
-  'S1'
-])
-param skuName string = 'S1'
-
-@description('Microsoft Fabric capacity SKU name')
-@allowed(['F2', 'F4', 'F8', 'F16', 'F32', 'F64', 'F128', 'F256', 'F512', 'F1024', 'F2048'])
-param fabricSkuName string = 'F2'
+var skuName = 'S1'
+var fabricSkuName = 'F2'
 
 @description('Primary AI model deployment name')
 param primaryModelDeploymentName string = 'gpt-4.1'
@@ -27,20 +18,16 @@ param primaryModelDeploymentName string = 'gpt-4.1'
 @description('Secondary AI model deployment name')
 param secondaryModelDeploymentName string = 'gpt-4.1-mini'
 
-@description('Admin UPN/email addresses for the Fabric capacity')
-param fabricAdminMembers array = []
-
 @description('Additional principals to grant Storage Blob Data Contributor on the storage account')
 param principals array = []
+
+var fabricAdminMembers = map(principals, p => p.id)
 
 @description('Fabric Data Agent MCP URL')
 param fabricMcpUrl string = ''
 
-@description('Fabric Lakehouse workspace ID')
-param fabricLakehouseWorkspaceId string = ''
-
-@description('Fabric Lakehouse ID')
-param fabricLakehouseId string = ''
+var fabricLakehouseWorkspaceId = ''
+var fabricLakehouseId = ''
 
 @description('Bing Search v7 API key')
 @secure()
@@ -53,13 +40,13 @@ var uniqueSuffix = uniqueString(resourceGroup().id)
 var tags = { project: projectName }
 var logAnalyticsName = '${baseName}-law'
 var appInsightsName = '${baseName}-appi'
-var storageAccountName = toLower('${baseName}sa${take(uniqueSuffix, 4)}')
+var storageAccountName = toLower('${baseName}sa')
 var appServicePlanName = '${baseName}-plan'
 var webAppName = '${baseName}-web'
 var hubName = '${baseName}-hub'
 var aiProjectName = '${baseName}-proj'
 var aiServicesName = '${baseName}-ais'
-var keyVaultName = '${baseName}-kv-${take(uniqueSuffix, 4)}'
+var keyVaultName = '${baseName}-kv'
 var fabricCapacityName = '${baseName}-fabric'
 
 module monitoring 'monitoring.bicep' = {

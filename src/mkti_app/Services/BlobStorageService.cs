@@ -19,7 +19,7 @@ public sealed class BlobStorageService
         _blobServiceClient = new BlobServiceClient(accountUri, credential);
     }
 
-    public async Task WriteTextAsync(string containerName, string blobName, string content)
+    public async Task WriteTextAsync(string containerName, string blobName, string content, string? contentType = null)
     {
         try
         {
@@ -27,7 +27,12 @@ public sealed class BlobStorageService
             await container.CreateIfNotExistsAsync();
             var blob = container.GetBlobClient(blobName);
             using var stream = new MemoryStream(System.Text.Encoding.UTF8.GetBytes(content));
-            await blob.UploadAsync(stream, overwrite: true);
+            var options = new Azure.Storage.Blobs.Models.BlobUploadOptions();
+            if (!string.IsNullOrWhiteSpace(contentType))
+            {
+                options.HttpHeaders = new Azure.Storage.Blobs.Models.BlobHttpHeaders { ContentType = contentType };
+            }
+            await blob.UploadAsync(stream, options);
         }
         catch (Exception ex)
         {

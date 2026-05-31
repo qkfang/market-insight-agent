@@ -64,7 +64,9 @@ function renderIngestTab() {
       if (!response.ok) return;
       const json = await response.json();
       renderFiles(json.filenames);
-    } catch {}
+    } catch (e) {
+      console.warn('Failed to load existing articles:', e);
+    }
   }
 
   loadExisting();

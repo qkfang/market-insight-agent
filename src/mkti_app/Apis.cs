@@ -23,7 +23,7 @@ public static class Apis
                 var after = await blobStorageService.ListBlobNamesAsync("news-store");
 
                 var delta = after.Count - before.Count;
-                var articlesStored = delta >= 0 ? delta : after.Count;
+                var articlesStored = Math.Max(0, delta);
 
                 return Results.Json(new
                 {

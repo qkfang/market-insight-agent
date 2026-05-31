@@ -1,0 +1,8 @@
+body { font-family: Arial, sans-serif; margin: 20px; }
+.tabs { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; }
+.tabs button { padding: 8px 12px; border: 1px solid #ccc; background: #f8f8f8; cursor: pointer; }
+.tabs button.active { background: #1e88e5; color: #fff; border-color: #1e88e5; }
+.panel { border: 1px solid #ddd; padding: 16px; min-height: 280px; }
+pre { white-space: pre-wrap; word-break: break-word; background: #f6f8fa; padding: 12px; }
+label { display: block; margin: 4px 0; }
+button.action { margin: 8px 0; padding: 8px 12px; }

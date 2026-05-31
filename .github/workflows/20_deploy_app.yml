@@ -4,7 +4,7 @@ on:
   push:
     branches: [main]
     paths:
-      - "src/NoiseCapture.Web/**"
+      - "src/mkti_app/**"
       - ".github/workflows/20_deploy_app.yml"
   workflow_dispatch:
 
@@ -26,12 +26,12 @@ jobs:
           dotnet-quality: 'preview'
 
       - name: Restore
-        working-directory: src/NoiseCapture.Web
-        run: dotnet restore NoiseCapture.Web.csproj
+        working-directory: src/mkti_app
+        run: dotnet restore mkti_app.csproj
 
       - name: Publish
-        working-directory: src/NoiseCapture.Web
-        run: dotnet publish NoiseCapture.Web.csproj -c Release -o ${{ github.workspace }}/publish --no-restore
+        working-directory: src/mkti_app
+        run: dotnet publish mkti_app.csproj -c Release -o ${{ github.workspace }}/publish --no-restore
 
       - name: Zip publish output
         working-directory: ${{ github.workspace }}/publish

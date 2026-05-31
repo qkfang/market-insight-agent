@@ -140,7 +140,7 @@ public static class Apis
                 var researchJson = System.Text.Json.JsonSerializer.Serialize(
                     new { sentiment, confidence, keyDrivers, summary, timestamp });
                 await blobStorageService.WriteTextAsync(
-                    "market-research", $"{researchDate}_copper_research.md", researchJson, "application/json");
+                    "market-research", $"{researchDate}_copper_research.json", researchJson, "application/json");
 
                 return Results.Json(new
                 {

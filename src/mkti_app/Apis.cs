@@ -131,6 +131,8 @@ public static class Apis
             try
             {
                 var result = await marketResearchAgent.RunAsync("Research the current copper market and summarize sentiment, drivers, and risks.");
+                var researchDate = DateTime.UtcNow.ToString("yyyy-MM-dd");
+                await blobStorageService.WriteTextAsync("market-research", $"{researchDate}_copper_research.md", result, "text/markdown");
                 var lakehouse = await fabricLakehouseService.QueryStatusAsync();
                 return Results.Json(new { status = "ok", result, lakehouse });
             }
@@ -144,33 +146,95 @@ public static class Apis
         {
             try
             {
-                var result = await insightGenerationAgent.RunAsync("Generate today's copper market insight report and store it in markdown.");
-                return Results.Json(new { status = "ok", result });
+                await insightGenerationAgent.RunAsync("Generate today's copper market insight report and store it in markdown.");
+                var latest = await ReadLatestInsightAsync(blobStorageService);
+                var preview = latest.Content.Length > 500 ? latest.Content[..500] : latest.Content;
+                return Results.Json(new
+                {
+                    success = true,
+                    date = latest.Date,
+                    filename = latest.Filename,
+                    preview
+                });
             }
             catch (Exception ex)
             {
-                return Results.Json(new { status = "error", error = ex.Message });
+                return Results.Json(new { success = false, date = string.Empty, filename = string.Empty, preview = string.Empty, error = ex.Message });
             }
         });
 
         app.MapGet("/api/insight/latest", async () =>
         {
-            var latest = await blobStorageService.ReadLatestTextAsync("market-insight");
-            return Results.Json(new { status = "ok", insight = latest ?? string.Empty });
+            var latest = await ReadLatestInsightAsync(blobStorageService);
+            return Results.Json(new { date = latest.Date, content = latest.Content, filename = latest.Filename });
         });
 
-        app.MapGet("/api/subscription", async () =>
+        app.MapGet("/api/insight/list", async () =>
         {
-            var subscription = await blobStorageService.ReadTextAsync("preferences", "subscription.json")
-                ?? "{\"markets\":[\"Copper\"],\"items\":[\"DailyInsight\"]}";
-            return Results.Json(new { status = "ok", subscription });
+            var names = await blobStorageService.ListBlobNamesAsync("market-insight");
+            var reports = names
+                .OrderByDescending(n => n, StringComparer.Ordinal)
+                .Select(n => new { filename = n, date = ExtractInsightDate(n) })
+                .ToArray();
+            return Results.Json(new { reports });
         });
 
-        app.MapPost("/api/subscription", async (SubscriptionRequest request) =>
+        app.MapGet("/api/insight/byDate", async (string date) =>
         {
-            await blobStorageService.WriteTextAsync("preferences", "subscription.json", request.ToJson());
-            return Results.Json(new { status = "saved" });
+            if (string.IsNullOrWhiteSpace(date))
+                return Results.Json(new { date = string.Empty, content = string.Empty, filename = string.Empty });
+
+            var filename = $"{date.Trim()}_copper_insight.md";
+            var content = await blobStorageService.ReadTextAsync("market-insight", filename);
+            return Results.Json(new
+            {
+                date = date.Trim(),
+                content = content ?? string.Empty,
+                filename = content is null ? string.Empty : filename
+            });
         });
+
+        app.MapGet("/api/subscription", async (HttpContext context) =>
+        {
+            var userId = ResolveUserId(context);
+            var raw = await blobStorageService.ReadTextAsync("subscriptions", $"{userId}.json");
+            var subscription = SubscriptionRequest.FromJson(raw);
+            return Results.Json(new { markets = subscription.Markets, items = subscription.Items });
+        });
+
+        app.MapPost("/api/subscription", async (HttpContext context, SubscriptionRequest request) =>
+        {
+            var userId = ResolveUserId(context);
+            await blobStorageService.WriteTextAsync("subscriptions", $"{userId}.json", request.ToJson());
+            return Results.Json(new { success = true });
+        });
+    }
+
+    private static string ResolveUserId(HttpContext context)
+    {
+        var ip = context.Connection.RemoteIpAddress?.ToString();
+        var userId = string.IsNullOrWhiteSpace(ip) ? "default" : ip;
+        return new string(userId.Select(c => char.IsLetterOrDigit(c) ? c : '_').ToArray());
+    }
+
+    private static string? ExtractInsightDate(string filename)
+    {
+        if (string.IsNullOrWhiteSpace(filename))
+            return null;
+        var token = Path.GetFileName(filename).Split('_', '.').FirstOrDefault();
+        return DateTime.TryParseExact(token, "yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture,
+            System.Globalization.DateTimeStyles.None, out _) ? token : null;
+    }
+
+    private static async Task<(string Date, string Content, string Filename)> ReadLatestInsightAsync(BlobStorageService blobStorageService)
+    {
+        var names = await blobStorageService.ListBlobNamesAsync("market-insight");
+        var latest = names.OrderByDescending(n => n, StringComparer.Ordinal).FirstOrDefault();
+        if (latest is null)
+            return (string.Empty, string.Empty, string.Empty);
+
+        var content = await blobStorageService.ReadTextAsync("market-insight", latest) ?? string.Empty;
+        return (ExtractInsightDate(latest) ?? string.Empty, content, latest);
     }
 
     private static int? TryGetWordCount(string? analysisJson)
@@ -195,5 +259,23 @@ public sealed record SubscriptionRequest(IReadOnlyList<string> Markets, IReadOnl
         var safeMarkets = Markets ?? [];
         var safeItems = Items ?? [];
         return System.Text.Json.JsonSerializer.Serialize(new { markets = safeMarkets, items = safeItems });
+    }
+
+    public static SubscriptionRequest FromJson(string? json)
+    {
+        if (string.IsNullOrWhiteSpace(json))
+            return new SubscriptionRequest([], []);
+
+        try
+        {
+            var parsed = System.Text.Json.JsonSerializer.Deserialize<SubscriptionRequest>(
+                json,
+                new System.Text.Json.JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+            return new SubscriptionRequest(parsed?.Markets ?? [], parsed?.Items ?? []);
+        }
+        catch (System.Text.Json.JsonException)
+        {
+            return new SubscriptionRequest([], []);
+        }
     }
 }

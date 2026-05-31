@@ -131,13 +131,24 @@ resource aiServicesAccount 'Microsoft.CognitiveServices/accounts@2024-04-01-prev
 // Grant the web app Cognitive Services User access (used by Document Intelligence)
 resource cognitiveServicesUserAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
   scope: aiServicesAccount
-  name: guid(aiServicesName, webAppName, 'a97b65f3-24c7-4388-baec-2e87618995b6')
+  name: guid(aiServicesName, webAppName, 'a97b65f3-24c7-4388-baec-2e87135dc908')
   properties: {
-    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', 'a97b65f3-24c7-4388-baec-2e87618995b6')
+    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', 'a97b65f3-24c7-4388-baec-2e87135dc908')
     principalId: appService.outputs.principalId
     principalType: 'ServicePrincipal'
   }
 }
+
+// Grant principals Cognitive Services User access on AI Services
+resource principalCognitiveServicesAssignments 'Microsoft.Authorization/roleAssignments@2022-04-01' = [for principal in principals: {
+  scope: aiServicesAccount
+  name: guid(aiServicesName, principal.id, 'a97b65f3-24c7-4388-baec-2e87135dc908')
+  properties: {
+    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', 'a97b65f3-24c7-4388-baec-2e87135dc908')
+    principalId: principal.id
+    principalType: principal.principalType
+  }
+}]
 
 output webAppName string = appService.outputs.webAppName
 output webAppUrl string = appService.outputs.webAppUrl

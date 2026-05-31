@@ -51,3 +51,5 @@ Document Intelligence: https://github.com/qkfang/invoice-ledger-agent/blob/main/
 this is the project to be developped. Try to split the development into a few tickets and they can be done in parallel by github coding agents @Copilot.
 
 if there is dependencies of each ticket, try to split into phases in title so that we can continue building once first ticekt is done. e.g. P1.a, P1.b, then P2.a, P2.b etc.
+
+create these tickets in github issues and give details in the ticket based on break down. probably 2-3 phases is enough. dont need unit test or documentation, but make sure the ticket will run the app to test out.

@@ -31,6 +31,121 @@ function addActionTab(key, title, endpoint, resultFormatter = (r) => JSON.string
   };
 }
 
+function escapeHtml(value) {
+  return String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+function closeModal() {
+  const existing = document.getElementById('modal-overlay');
+  if (existing) existing.remove();
+}
+
+function showModal(title, body) {
+  closeModal();
+  const overlay = document.createElement('div');
+  overlay.id = 'modal-overlay';
+  overlay.className = 'modal-overlay';
+  overlay.innerHTML = `
+    <div class="modal">
+      <div class="modal-header">
+        <strong>${escapeHtml(title)}</strong>
+        <button class="modal-close" type="button">&times;</button>
+      </div>
+      <pre class="modal-body">${escapeHtml(body)}</pre>
+    </div>`;
+  overlay.addEventListener('click', (e) => { if (e.target === overlay) closeModal(); });
+  overlay.querySelector('.modal-close').onclick = closeModal;
+  document.body.appendChild(overlay);
+}
+
+async function previewAnalysis(filename) {
+  showModal(filename, 'Loading...');
+  try {
+    const response = await fetch(`/api/news/analysis/content?name=${encodeURIComponent(filename)}`);
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    const data = await response.json();
+    if (data.status !== 'ok') throw new Error(data.error || 'Failed to load content.');
+    let body = data.content;
+    try {
+      const parsed = JSON.parse(data.content);
+      body = parsed.markdownContent || data.content;
+    } catch {}
+    showModal(filename, body);
+  } catch (e) {
+    showModal(filename, `Error: ${e.message}`);
+  }
+}
+
+function renderAnalysisTable(articles) {
+  const tableEl = document.getElementById('analysis-table');
+  if (!tableEl) return;
+  if (!articles || articles.length === 0) {
+    tableEl.innerHTML = '<p>No analyzed articles yet.</p>';
+    return;
+  }
+  const rows = articles.map(a => `
+    <tr class="analysis-row" data-name="${escapeHtml(a.filename)}">
+      <td>${escapeHtml(a.title || a.filename)}</td>
+      <td>${escapeHtml(a.date || '')}</td>
+      <td>${a.wordCount ?? ''}</td>
+    </tr>`).join('');
+  tableEl.innerHTML = `
+    <table class="analysis">
+      <thead><tr><th>Article</th><th>Date</th><th>Word Count</th></tr></thead>
+      <tbody>${rows}</tbody>
+    </table>`;
+  tableEl.querySelectorAll('.analysis-row').forEach(row => {
+    row.onclick = () => previewAnalysis(row.dataset.name);
+  });
+}
+
+async function loadAnalysisTable() {
+  const tableEl = document.getElementById('analysis-table');
+  if (tableEl) tableEl.innerHTML = '<p>Loading analyzed articles...</p>';
+  try {
+    const response = await fetch('/api/news/analysis');
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    const data = await response.json();
+    renderAnalysisTable(data.articles || []);
+  } catch (e) {
+    if (tableEl) tableEl.innerHTML = `Error: ${escapeHtml(e.message)}`;
+  }
+}
+
+async function renderAnalyzeTab() {
+  contentEl.innerHTML = `
+    <h2>News Analysis</h2>
+    <p>Parse unprocessed news articles with Document Intelligence into structured JSON.</p>
+    <button class="action" id="analyze-btn">Analyze Articles</button>
+    <pre id="result">Ready</pre>
+    <h3>Analyzed Articles</h3>
+    <div id="analysis-table"></div>`;
+
+  document.getElementById('analyze-btn').onclick = async () => {
+    const pre = document.getElementById('result');
+    const btn = document.getElementById('analyze-btn');
+    btn.disabled = true;
+    pre.textContent = 'Analyzing... this may take a moment.';
+    try {
+      const response = await fetch('/api/news/analyze');
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      const json = await response.json();
+      pre.textContent = JSON.stringify(json, null, 2);
+      await loadAnalysisTable();
+    } catch (e) {
+      pre.textContent = `Error: ${e.message}`;
+    } finally {
+      btn.disabled = false;
+    }
+  };
+
+  await loadAnalysisTable();
+}
+
 function renderIngestTab() {
   contentEl.innerHTML = `
     <h2>News Ingestion</h2>
@@ -97,7 +212,7 @@ function renderIngestTab() {
 
 async function renderTab(key) {
   if (key === 'ingest') return renderIngestTab();
-  if (key === 'analyze') return addActionTab(key, 'News Analysis', '/api/news/analyze');
+  if (key === 'analyze') return renderAnalyzeTab();
   if (key === 'research') return addActionTab(key, 'Market Research', '/api/market/research');
   if (key === 'generate') return addActionTab(key, 'Insight Generation', '/api/insight/generate');
 

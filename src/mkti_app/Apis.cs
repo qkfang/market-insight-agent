@@ -49,14 +49,81 @@ public static class Apis
         {
             try
             {
-                var result = await newsAnalysisAgent.RunAsync("Analyze the latest ingested news and provide structured article summaries as JSON.");
-                var parsed = await blobStorageService.ReadLatestTextAsync("news-analysis");
-                return Results.Json(new { status = "ok", result, parsedArticles = parsed });
+                var before = new HashSet<string>(
+                    await blobStorageService.ListBlobNamesAsync("news-analysis"),
+                    StringComparer.OrdinalIgnoreCase);
+
+                var result = await newsAnalysisAgent.RunAsync(
+                    "Analyze all unprocessed news articles and extract structured content.");
+
+                var afterNames = await blobStorageService.ListBlobNamesAsync("news-analysis");
+                var results = new List<object>();
+                foreach (var name in afterNames.Where(n => !before.Contains(n)))
+                {
+                    var content = await blobStorageService.ReadTextAsync("news-analysis", name);
+                    int? wordCount = TryGetWordCount(content);
+                    results.Add(new { filename = name, wordCount });
+                }
+
+                return Results.Json(new
+                {
+                    success = true,
+                    articlesAnalyzed = results.Count,
+                    results,
+                    result
+                });
+            }
+            catch (Exception ex)
+            {
+                return Results.Json(new { success = false, status = "error", error = ex.Message });
+            }
+        });
+
+        app.MapGet("/api/news/analysis", async () =>
+        {
+            try
+            {
+                var names = await blobStorageService.ListBlobNamesAsync("news-analysis");
+                var articles = new List<object>();
+                foreach (var name in names)
+                {
+                    var content = await blobStorageService.ReadTextAsync("news-analysis", name);
+                    string? title = null, date = null, source = null;
+                    int? wordCount = null;
+                    if (!string.IsNullOrWhiteSpace(content))
+                    {
+                        try
+                        {
+                            using var doc = System.Text.Json.JsonDocument.Parse(content);
+                            var root = doc.RootElement;
+                            if (root.TryGetProperty("title", out var t)) title = t.GetString();
+                            if (root.TryGetProperty("date", out var d)) date = d.GetString();
+                            if (root.TryGetProperty("source", out var s)) source = s.GetString();
+                            if (root.TryGetProperty("wordCount", out var w) && w.TryGetInt32(out var wc)) wordCount = wc;
+                        }
+                        catch (System.Text.Json.JsonException) { }
+                    }
+                    articles.Add(new { filename = name, title, date, source, wordCount });
+                }
+
+                return Results.Json(new { status = "ok", articles });
             }
             catch (Exception ex)
             {
                 return Results.Json(new { status = "error", error = ex.Message });
             }
+        });
+
+        app.MapGet("/api/news/analysis/content", async (string name) =>
+        {
+            if (string.IsNullOrWhiteSpace(name))
+                return Results.Json(new { status = "error", error = "name is required." });
+
+            var content = await blobStorageService.ReadTextAsync("news-analysis", name);
+            if (content is null)
+                return Results.Json(new { status = "error", error = "Analysis not found." });
+
+            return Results.Json(new { status = "ok", content });
         });
 
         app.MapGet("/api/market/research", async () =>
@@ -104,6 +171,20 @@ public static class Apis
             await blobStorageService.WriteTextAsync("preferences", "subscription.json", request.ToJson());
             return Results.Json(new { status = "saved" });
         });
+    }
+
+    private static int? TryGetWordCount(string? analysisJson)
+    {
+        if (string.IsNullOrWhiteSpace(analysisJson))
+            return null;
+        try
+        {
+            using var doc = System.Text.Json.JsonDocument.Parse(analysisJson);
+            if (doc.RootElement.TryGetProperty("wordCount", out var w) && w.TryGetInt32(out var wc))
+                return wc;
+        }
+        catch (System.Text.Json.JsonException) { }
+        return null;
     }
 }
 

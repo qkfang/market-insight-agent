@@ -22,6 +22,9 @@ param aiProjectEndpoint string
 @description('Primary AI model deployment name')
 param primaryModelDeploymentName string
 
+@description('Azure Document Intelligence endpoint')
+param docIntelligenceEndpoint string = ''
+
 resource appServicePlan 'Microsoft.Web/serverfarms@2023-12-01' = {
   name: appServicePlanName
   location: location
@@ -74,6 +77,10 @@ resource webApp 'Microsoft.Web/sites@2023-12-01' = {
         {
           name: 'AZURE_STORAGE_ACCOUNT_URL'
           value: 'https://${storageAccountName}.blob.${environment().suffixes.storage}'
+        }
+        {
+          name: 'AZURE_DOC_INTELLIGENCE_ENDPOINT'
+          value: docIntelligenceEndpoint
         }
       ]
     }

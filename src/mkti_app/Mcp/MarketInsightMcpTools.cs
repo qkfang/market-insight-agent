@@ -286,8 +286,8 @@ public sealed class MarketInsightMcpTools
 
     [McpServerTool(Name = "store_market_insight"), Description("Store the daily copper market insight markdown to the market-insight blob container as {date}_copper_insight.md and to the Fabric Lakehouse market_insight/ folder. Returns JSON with the blob URL, filename and date.")]
     public async Task<string> StoreMarketInsight(
-        [Description("Report date in yyyy-MM-dd format. Defaults to today's UTC date when omitted.")] string date,
-        [Description("Insight report content as markdown")] string content)
+        [Description("Insight report content as markdown")] string content,
+        [Description("Report date in yyyy-MM-dd format. Defaults to today's UTC date when omitted.")] string? date = null)
     {
         var resolvedDate = string.IsNullOrWhiteSpace(date)
             ? DateTime.UtcNow.ToString("yyyy-MM-dd")

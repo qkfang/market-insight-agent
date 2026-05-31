@@ -45,6 +45,9 @@ var storageAccountName = builder.Configuration["AZURE_STORAGE_ACCOUNT_NAME"] is 
 var docIntelligenceEndpoint = builder.Configuration["AZURE_DOC_INTELLIGENCE_ENDPOINT"] ?? string.Empty;
 var fabricWorkspaceId = builder.Configuration["FABRIC_LAKEHOUSE_WORKSPACE_ID"] ?? string.Empty;
 var fabricLakehouseId = builder.Configuration["FABRIC_LAKEHOUSE_ID"] ?? string.Empty;
+var fabricMcpUrl = builder.Configuration["FABRIC_MCP_URL"] ?? string.Empty;
+var bingSearchApiKey = builder.Configuration["BING_SEARCH_API_KEY"] ?? string.Empty;
+var bingSearchEndpoint = builder.Configuration["BING_SEARCH_ENDPOINT"] ?? "https://api.bing.microsoft.com/";
 
 var credential = new DefaultAzureCredential();
 
@@ -64,6 +67,12 @@ builder.Services.AddSingleton(sp => new FabricLakehouseService(
     credential,
     sp.GetRequiredService<IHttpClientFactory>(),
     sp.GetRequiredService<ILogger<FabricLakehouseService>>()));
+
+builder.Services.AddSingleton(sp => new BingSearchService(
+    bingSearchApiKey,
+    bingSearchEndpoint,
+    sp.GetRequiredService<IHttpClientFactory>(),
+    sp.GetRequiredService<ILogger<BingSearchService>>()));
 
 builder.Services.AddMcpServer()
     .WithHttpTransport(options => { options.Stateless = true; })
@@ -107,9 +116,19 @@ var appMcpTool = ResponseTool.CreateMcpTool(
     serverUri: new Uri($"{appMcpUrl.TrimEnd('/')}/mcp"),
     toolCallApprovalPolicy: new McpToolCallApprovalPolicy(GlobalMcpToolCallApprovalPolicy.NeverRequireApproval));
 
+var marketResearchTools = new List<ResponseTool> { appMcpTool };
+if (!string.IsNullOrWhiteSpace(fabricMcpUrl))
+{
+    var fabricMcpTool = ResponseTool.CreateMcpTool(
+        serverLabel: "fabric-data-agent",
+        serverUri: new Uri($"{fabricMcpUrl.TrimEnd('/')}/mcp"),
+        toolCallApprovalPolicy: new McpToolCallApprovalPolicy(GlobalMcpToolCallApprovalPolicy.NeverRequireApproval));
+    marketResearchTools.Add(fabricMcpTool);
+}
+
 var newsIngestionAgent = new NewsIngestionAgent(aiProjectClient, deploymentName, [appMcpTool], loggerFactory.CreateLogger<NewsIngestionAgent>());
 var newsAnalysisAgent = new NewsAnalysisAgent(aiProjectClient, deploymentName, [appMcpTool], loggerFactory.CreateLogger<NewsAnalysisAgent>());
-var marketResearchAgent = new MarketResearchAgent(aiProjectClient, deploymentName, [appMcpTool], loggerFactory.CreateLogger<MarketResearchAgent>());
+var marketResearchAgent = new MarketResearchAgent(aiProjectClient, deploymentName, marketResearchTools, loggerFactory.CreateLogger<MarketResearchAgent>());
 var insightGenerationAgent = new InsightGenerationAgent(aiProjectClient, deploymentName, [appMcpTool], loggerFactory.CreateLogger<InsightGenerationAgent>());
 
 var blobStorageService = app.Services.GetRequiredService<BlobStorageService>();

@@ -23,3 +23,12 @@ table.analysis tbody tr:hover { background: #eef6ff; }
 #ingest-meta { margin: 8px 0; color: #555; }
 #ingest-summary { margin: 8px 0; }
 #ingest-files { margin: 4px 0 12px; }
+.sentiment-badge { display: inline-flex; align-items: center; gap: 8px; padding: 8px 14px; border-radius: 20px; font-weight: bold; margin: 12px 0; border: 2px solid #ddd; }
+.sentiment-badge.bullish { background: #e6f4ea; border-color: #34a853; color: #1e7e34; }
+.sentiment-badge.bearish { background: #fce8e6; border-color: #ea4335; color: #c5221f; }
+.sentiment-badge.neutral { background: #fef7e0; border-color: #fbbc04; color: #b06000; }
+.sentiment-icon { font-size: 18px; }
+.sentiment-confidence { font-weight: normal; opacity: 0.85; }
+.research-summary { white-space: pre-wrap; line-height: 1.5; }
+.research-timestamp { color: #777; }
+.research-error { color: #c5221f; }

@@ -25,6 +25,16 @@ param primaryModelDeploymentName string
 @description('Azure Document Intelligence endpoint')
 param docIntelligenceEndpoint string = ''
 
+@description('Fabric Data Agent MCP URL')
+param fabricMcpUrl string = ''
+
+@description('Bing Search v7 API key')
+@secure()
+param bingSearchApiKey string = ''
+
+@description('Bing Search v7 endpoint')
+param bingSearchEndpoint string = 'https://api.bing.microsoft.com/'
+
 resource appServicePlan 'Microsoft.Web/serverfarms@2023-12-01' = {
   name: appServicePlanName
   location: location
@@ -81,6 +91,18 @@ resource webApp 'Microsoft.Web/sites@2023-12-01' = {
         {
           name: 'AZURE_DOC_INTELLIGENCE_ENDPOINT'
           value: docIntelligenceEndpoint
+        }
+        {
+          name: 'FABRIC_MCP_URL'
+          value: fabricMcpUrl
+        }
+        {
+          name: 'BING_SEARCH_API_KEY'
+          value: bingSearchApiKey
+        }
+        {
+          name: 'BING_SEARCH_ENDPOINT'
+          value: bingSearchEndpoint
         }
       ]
     }

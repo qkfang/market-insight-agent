@@ -25,17 +25,20 @@ public sealed class MarketInsightMcpTools
     private readonly BlobStorageService _blobStorageService;
     private readonly DocIntelligenceService _docIntelligenceService;
     private readonly FabricLakehouseService _fabricLakehouseService;
+    private readonly BingSearchService _bingSearchService;
     private readonly IHttpClientFactory _httpClientFactory;
 
     public MarketInsightMcpTools(
         BlobStorageService blobStorageService,
         DocIntelligenceService docIntelligenceService,
         FabricLakehouseService fabricLakehouseService,
+        BingSearchService bingSearchService,
         IHttpClientFactory httpClientFactory)
     {
         _blobStorageService = blobStorageService;
         _docIntelligenceService = docIntelligenceService;
         _fabricLakehouseService = fabricLakehouseService;
+        _bingSearchService = bingSearchService;
         _httpClientFactory = httpClientFactory;
     }
 
@@ -247,6 +250,100 @@ public sealed class MarketInsightMcpTools
             : await _blobStorageService.ReadTextAsync(NewsAnalysisContainer, blobName);
 
         return value ?? string.Empty;
+    }
+
+    [McpServerTool(Name = "read_latest_news_analysis"), Description("Read the N most recent news analysis JSON documents from the news-analysis blob container. Returns a JSON array of { filename, title, date, markdownContent }.")]
+    public async Task<string> ReadLatestNewsAnalysis(
+        [Description("Number of most recent analysis documents to read. Defaults to 10.")] int count = 10)
+    {
+        var names = await _blobStorageService.ListRecentBlobNamesAsync(NewsAnalysisContainer, count);
+        var items = new List<object>();
+
+        foreach (var name in names)
+        {
+            var content = await _blobStorageService.ReadTextAsync(NewsAnalysisContainer, name);
+            string? title = null, date = null, markdownContent = null;
+
+            if (!string.IsNullOrWhiteSpace(content))
+            {
+                try
+                {
+                    using var doc = JsonDocument.Parse(content);
+                    var root = doc.RootElement;
+                    if (root.TryGetProperty("title", out var t)) title = t.GetString();
+                    if (root.TryGetProperty("date", out var d)) date = d.GetString();
+                    if (root.TryGetProperty("markdownContent", out var m)) markdownContent = m.GetString();
+                }
+                catch (JsonException)
+                {
+                    markdownContent = content;
+                }
+            }
+
+            items.Add(new { filename = name, title, date, markdownContent });
+        }
+
+        return JsonSerializer.Serialize(items, JsonOptions);
+    }
+
+    [McpServerTool(Name = "bing_search_copper_market"), Description("Search Bing for current copper price and market news. Returns a JSON array of up to 5 results with { title, snippet, url }.")]
+    public async Task<string> BingSearchCopperMarket(
+        [Description("Search query, e.g. 'copper price today LME market sentiment'.")] string query)
+    {
+        if (string.IsNullOrWhiteSpace(query))
+            query = "copper price today LME market sentiment";
+
+        if (!_bingSearchService.IsConfigured)
+            return "Error: Bing Search is not configured (set BING_SEARCH_API_KEY and BING_SEARCH_ENDPOINT).";
+
+        var results = await _bingSearchService.SearchAsync(query, 5);
+        var items = results
+            .Select(r => new { title = r.Title, snippet = r.Snippet, url = r.Url })
+            .ToArray();
+
+        return JsonSerializer.Serialize(items, JsonOptions);
+    }
+
+    [McpServerTool(Name = "get_copper_sentiment_summary"), Description("Format a JSON array of article summaries into a single prompt-friendly text block for sentiment analysis. Returns the formatted text.")]
+    public string GetCopperSentimentSummary(
+        [Description("JSON array of article summaries.")] string articles)
+    {
+        if (string.IsNullOrWhiteSpace(articles))
+            return "No articles provided.";
+
+        var builder = new System.Text.StringBuilder();
+        try
+        {
+            using var doc = JsonDocument.Parse(articles);
+            if (doc.RootElement.ValueKind == JsonValueKind.Array)
+            {
+                var index = 1;
+                foreach (var item in doc.RootElement.EnumerateArray())
+                {
+                    string? title = item.TryGetProperty("title", out var t) ? t.GetString() : null;
+                    string? date = item.TryGetProperty("date", out var d) ? d.GetString() : null;
+                    string? body = null;
+                    if (item.TryGetProperty("markdownContent", out var m)) body = m.GetString();
+                    else if (item.TryGetProperty("snippet", out var s)) body = s.GetString();
+
+                    builder.AppendLine($"## Article {index}: {title ?? "(untitled)"}");
+                    if (!string.IsNullOrWhiteSpace(date)) builder.AppendLine($"Date: {date}");
+                    if (!string.IsNullOrWhiteSpace(body)) builder.AppendLine(body);
+                    builder.AppendLine();
+                    index++;
+                }
+            }
+            else
+            {
+                builder.Append(articles);
+            }
+        }
+        catch (JsonException)
+        {
+            builder.Append(articles);
+        }
+
+        return builder.ToString().Trim();
     }
 
     [McpServerTool(Name = "store_insight"), Description("Write daily market insight markdown into blob container market-insight.")]

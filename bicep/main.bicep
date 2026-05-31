@@ -33,6 +33,16 @@ param fabricAdminMembers array = []
 @description('Additional principals to grant Storage Blob Data Contributor on the storage account')
 param principals array = []
 
+@description('Fabric Data Agent MCP URL')
+param fabricMcpUrl string = ''
+
+@description('Bing Search v7 API key')
+@secure()
+param bingSearchApiKey string = ''
+
+@description('Bing Search v7 endpoint')
+param bingSearchEndpoint string = 'https://api.bing.microsoft.com/'
+
 var uniqueSuffix = uniqueString(resourceGroup().id)
 var tags = { project: projectName }
 var logAnalyticsName = '${baseName}-law'
@@ -101,6 +111,9 @@ module appService 'appservice.bicep' = {
     aiProjectEndpoint: foundry.outputs.aiProjectEndpoint
     primaryModelDeploymentName: foundry.outputs.primaryModelDeploymentName
     docIntelligenceEndpoint: foundry.outputs.aiServicesEndpoint
+    fabricMcpUrl: fabricMcpUrl
+    bingSearchApiKey: bingSearchApiKey
+    bingSearchEndpoint: bingSearchEndpoint
   }
 }
 

@@ -42,6 +42,7 @@ var projectEndpoint = builder.Configuration["AZURE_AI_PROJECT_ENDPOINT"] ?? "htt
 var deploymentName = builder.Configuration["AZURE_AI_MODEL_DEPLOYMENT_NAME"] ?? "gpt-4.1-mini";
 var appMcpUrl = builder.Configuration["APP_MCP_URL"] ?? "http://localhost:5001";
 var storageAccountName = builder.Configuration["AZURE_STORAGE_ACCOUNT_NAME"] ?? "devstoreaccount1";
+var docIntelligenceEndpoint = builder.Configuration["AZURE_DOC_INTELLIGENCE_ENDPOINT"] ?? string.Empty;
 var fabricWorkspaceId = builder.Configuration["FABRIC_LAKEHOUSE_WORKSPACE_ID"] ?? string.Empty;
 var fabricLakehouseId = builder.Configuration["FABRIC_LAKEHOUSE_ID"] ?? string.Empty;
 
@@ -51,6 +52,11 @@ builder.Services.AddSingleton(sp => new BlobStorageService(
     storageAccountName,
     credential,
     sp.GetRequiredService<ILogger<BlobStorageService>>()));
+
+builder.Services.AddSingleton(sp => new DocIntelligenceService(
+    docIntelligenceEndpoint,
+    credential,
+    sp.GetRequiredService<ILogger<DocIntelligenceService>>()));
 
 builder.Services.AddSingleton(sp => new FabricLakehouseService(
     fabricWorkspaceId,

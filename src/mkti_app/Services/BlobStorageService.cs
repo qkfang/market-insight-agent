@@ -58,6 +58,75 @@ public sealed class BlobStorageService
         }
     }
 
+    public async Task<byte[]?> ReadBytesAsync(string containerName, string blobName)
+    {
+        try
+        {
+            var container = _blobServiceClient.GetBlobContainerClient(containerName);
+            var blob = container.GetBlobClient(blobName);
+            if (!await blob.ExistsAsync())
+                return null;
+
+            var download = await blob.DownloadContentAsync();
+            return download.Value.Content.ToArray();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Falling back to local storage for byte read from {Container}/{Blob}", containerName, blobName);
+            var fullPath = GetFallbackPath(containerName, blobName);
+            return File.Exists(fullPath) ? await File.ReadAllBytesAsync(fullPath) : null;
+        }
+    }
+
+    public async Task<bool> ExistsAsync(string containerName, string blobName)
+    {
+        try
+        {
+            var container = _blobServiceClient.GetBlobContainerClient(containerName);
+            var blob = container.GetBlobClient(blobName);
+            return await blob.ExistsAsync();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Falling back to local storage for exists check on {Container}/{Blob}", containerName, blobName);
+            return File.Exists(GetFallbackPath(containerName, blobName));
+        }
+    }
+
+    public async Task<IReadOnlyList<string>> ListBlobNamesAsync(string containerName)
+    {
+        try
+        {
+            var container = _blobServiceClient.GetBlobContainerClient(containerName);
+            if (!await container.ExistsAsync())
+                return [];
+
+            var names = new List<string>();
+            await foreach (var blobItem in container.GetBlobsAsync())
+            {
+                names.Add(blobItem.Name);
+            }
+            return names;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Falling back to local storage for blob listing of {Container}", containerName);
+            var folder = Path.Combine(_fallbackRoot, containerName);
+            if (!Directory.Exists(folder))
+                return [];
+
+            return Directory.EnumerateFiles(folder, "*", SearchOption.AllDirectories)
+                .Select(path => Path.GetRelativePath(folder, path).Replace('\\', '/'))
+                .ToArray();
+        }
+    }
+
+    public string GetBlobUrl(string containerName, string blobName)
+    {
+        var container = _blobServiceClient.GetBlobContainerClient(containerName);
+        return container.GetBlobClient(blobName).Uri.ToString();
+    }
+
     public async Task<string?> ReadLatestTextAsync(string containerName)
     {
         try

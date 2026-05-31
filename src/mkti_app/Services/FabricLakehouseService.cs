@@ -25,6 +25,67 @@ public sealed class FabricLakehouseService
         _logger = logger;
     }
 
+    public async Task<bool> WriteFileAsync(string relativePath, string content)
+    {
+        if (string.IsNullOrWhiteSpace(_workspaceId) || string.IsNullOrWhiteSpace(_lakehouseId))
+        {
+            _logger.LogInformation("Fabric workspace/lakehouse config is not set; skipping OneLake write for {Path}.", relativePath);
+            return false;
+        }
+
+        try
+        {
+            var token = await _credential.GetTokenAsync(
+                new TokenRequestContext(["https://storage.azure.com/.default"]),
+                CancellationToken.None);
+            var client = _httpClientFactory.CreateClient();
+
+            var safePath = string.Join('/', relativePath
+                .Replace('\\', '/')
+                .Split('/', StringSplitOptions.RemoveEmptyEntries)
+                .Where(part => part != "." && part != ".."));
+            var baseUri = $"https://onelake.dfs.fabric.microsoft.com/{_workspaceId}/{_lakehouseId}/Files/{safePath}";
+            var bytes = System.Text.Encoding.UTF8.GetBytes(content);
+
+            var createRequest = new HttpRequestMessage(HttpMethod.Put, $"{baseUri}?resource=file");
+            createRequest.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token.Token);
+            var createResponse = await client.SendAsync(createRequest);
+            if (!createResponse.IsSuccessStatusCode)
+            {
+                _logger.LogWarning("Failed to create OneLake file {Path}: {Status}", safePath, (int)createResponse.StatusCode);
+                return false;
+            }
+
+            var appendRequest = new HttpRequestMessage(HttpMethod.Patch, $"{baseUri}?action=append&position=0")
+            {
+                Content = new ByteArrayContent(bytes)
+            };
+            appendRequest.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token.Token);
+            var appendResponse = await client.SendAsync(appendRequest);
+            if (!appendResponse.IsSuccessStatusCode)
+            {
+                _logger.LogWarning("Failed to append OneLake file {Path}: {Status}", safePath, (int)appendResponse.StatusCode);
+                return false;
+            }
+
+            var flushRequest = new HttpRequestMessage(HttpMethod.Patch, $"{baseUri}?action=flush&position={bytes.Length}");
+            flushRequest.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token.Token);
+            var flushResponse = await client.SendAsync(flushRequest);
+            if (!flushResponse.IsSuccessStatusCode)
+            {
+                _logger.LogWarning("Failed to flush OneLake file {Path}: {Status}", safePath, (int)flushResponse.StatusCode);
+                return false;
+            }
+
+            return true;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to write file to Fabric lakehouse: {Path}", relativePath);
+            return false;
+        }
+    }
+
     public async Task<object> QueryStatusAsync()
     {
         if (string.IsNullOrWhiteSpace(_workspaceId) || string.IsNullOrWhiteSpace(_lakehouseId))

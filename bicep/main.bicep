@@ -100,6 +100,7 @@ module appService 'appservice.bicep' = {
     storageAccountName: storageAccountName
     aiProjectEndpoint: foundry.outputs.aiProjectEndpoint
     primaryModelDeploymentName: foundry.outputs.primaryModelDeploymentName
+    docIntelligenceEndpoint: foundry.outputs.aiServicesEndpoint
   }
 }
 
@@ -126,6 +127,21 @@ resource principalBlobDataContributorAssignments 'Microsoft.Authorization/roleAs
     principalType: principal.principalType
   }
 }]
+
+resource aiServicesAccount 'Microsoft.CognitiveServices/accounts@2024-04-01-preview' existing = {
+  name: aiServicesName
+}
+
+// Grant the web app Cognitive Services User access (used by Document Intelligence)
+resource cognitiveServicesUserAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+  scope: aiServicesAccount
+  name: guid(aiServicesName, webAppName, 'a97b65f3-24c7-4388-baec-2e87618995b6')
+  properties: {
+    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', 'a97b65f3-24c7-4388-baec-2e87618995b6')
+    principalId: appService.outputs.principalId
+    principalType: 'ServicePrincipal'
+  }
+}
 
 output webAppName string = appService.outputs.webAppName
 output webAppUrl string = appService.outputs.webAppUrl

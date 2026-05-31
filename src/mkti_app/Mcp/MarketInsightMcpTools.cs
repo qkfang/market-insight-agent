@@ -39,15 +39,15 @@ public sealed class MarketInsightMcpTools
         return $"Stored news as {blobName}";
     }
 
-    [McpServerTool(Name = "list_unprocessed_news"), Description("List raw news articles in the news-store container that have not yet been analysed (no matching JSON in news-analysis). Returns JSON array of { filename, blobUrl }.")]
+    [McpServerTool(Name = "list_unprocessed_news"), Description("List raw news articles in the news-store container that have not yet been analyzed (no matching JSON in news-analysis). Returns JSON array of { filename, blobUrl }.")]
     public async Task<string> ListUnprocessedNews()
     {
         var sourceNames = await _blobStorageService.ListBlobNamesAsync(NewsStoreContainer);
-        var analysedNames = await _blobStorageService.ListBlobNamesAsync(NewsAnalysisContainer);
-        var analysedSet = new HashSet<string>(analysedNames, StringComparer.OrdinalIgnoreCase);
+        var analyzedNames = await _blobStorageService.ListBlobNamesAsync(NewsAnalysisContainer);
+        var analyzedSet = new HashSet<string>(analyzedNames, StringComparer.OrdinalIgnoreCase);
 
         var unprocessed = sourceNames
-            .Where(name => !analysedSet.Contains($"{name}.json"))
+            .Where(name => !analyzedSet.Contains($"{name}.json"))
             .Select(name => new
             {
                 filename = name,
@@ -58,7 +58,7 @@ public sealed class MarketInsightMcpTools
         return JsonSerializer.Serialize(unprocessed, JsonOptions);
     }
 
-    [McpServerTool(Name = "parse_article_with_doc_intelligence"), Description("Download a raw news article from news-store and use Azure Document Intelligence (prebuilt-read) to extract its content as markdown. Returns JSON { title, date, source, markdownContent, wordCount }.")]
+    [McpServerTool(Name = "parse_article_with_doc_intelligence"), Description("Retrieve a raw news article from the news-store container (blob or local fallback) and use Azure Document Intelligence (prebuilt-read) to extract its content as markdown. Returns JSON { title, date, source, markdownContent, wordCount }.")]
     public async Task<string> ParseArticleWithDocIntelligence(
         [Description("Blob name (filename) of the article in the news-store container")] string filename,
         [Description("Optional blob URL of the article (informational).")] string? blobUrl = null)
@@ -81,7 +81,7 @@ public sealed class MarketInsightMcpTools
         }
         catch (Exception ex)
         {
-            return $"Error: failed to analyse '{filename}' with Document Intelligence: {ex.Message}";
+            return $"Error: failed to analyze '{filename}' with Document Intelligence: {ex.Message}";
         }
 
         var wordCount = markdown
@@ -117,7 +117,7 @@ public sealed class MarketInsightMcpTools
         return $"Stored analysis as {blobName} (blob: yes, fabric: {(fabricStored ? "yes" : "skipped")}).";
     }
 
-    [McpServerTool(Name = "list_news_analysis"), Description("List analysed articles from the news-analysis container with metadata. Returns JSON array of { filename, title, date, source, wordCount }.")]
+    [McpServerTool(Name = "list_news_analysis"), Description("List analyzed articles from the news-analysis container with metadata. Returns JSON array of { filename, title, date, source, wordCount }.")]
     public async Task<string> ListNewsAnalysis()
     {
         var names = await _blobStorageService.ListBlobNamesAsync(NewsAnalysisContainer);

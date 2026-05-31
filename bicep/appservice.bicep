@@ -28,6 +28,12 @@ param docIntelligenceEndpoint string = ''
 @description('Fabric Data Agent MCP URL')
 param fabricMcpUrl string = ''
 
+@description('Fabric Lakehouse workspace ID')
+param fabricLakehouseWorkspaceId string = ''
+
+@description('Fabric Lakehouse ID')
+param fabricLakehouseId string = ''
+
 @description('Bing Search v7 API key')
 @secure()
 param bingSearchApiKey string = ''
@@ -95,6 +101,18 @@ resource webApp 'Microsoft.Web/sites@2023-12-01' = {
         {
           name: 'FABRIC_MCP_URL'
           value: fabricMcpUrl
+        }
+        {
+          name: 'FABRIC_LAKEHOUSE_WORKSPACE_ID'
+          value: fabricLakehouseWorkspaceId
+        }
+        {
+          name: 'FABRIC_LAKEHOUSE_ID'
+          value: fabricLakehouseId
+        }
+        {
+          name: 'APP_MCP_URL'
+          value: 'https://${webAppName}.azurewebsites.net'
         }
         {
           name: 'BING_SEARCH_API_KEY'

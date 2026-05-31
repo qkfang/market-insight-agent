@@ -47,7 +47,7 @@ var hubName = '${baseName}-hub'
 var aiProjectName = '${baseName}-proj'
 var aiServicesName = '${baseName}-ais'
 var keyVaultName = '${baseName}-kv'
-var fabricCapacityName = '${baseName}-fabric'
+var fabricCapacityName = '${baseName}fabric'
 
 module monitoring 'monitoring.bicep' = {
   name: 'monitoring'
@@ -112,29 +112,16 @@ module appService 'appservice.bicep' = {
   }
 }
 
-resource storageAccount 'Microsoft.Storage/storageAccounts@2023-05-01' existing = {
-  name: storageAccountName
-}
-
-resource blobDataContributorAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
-  scope: storageAccount
-  name: guid(storageAccountName, webAppName, 'ba92f5b4-2d11-453d-a403-e96b0029c9fe')
-  properties: {
-    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', 'ba92f5b4-2d11-453d-a403-e96b0029c9fe')
-    principalId: appService.outputs.principalId
-    principalType: 'ServicePrincipal'
+module storageRoles 'storageroles.bicep' = {
+  name: 'storageroles'
+  params: {
+    storageAccountName: storageAccountName
+    webAppPrincipalId: appService.outputs.principalId
+    webAppName: webAppName
+    principals: principals
   }
+  dependsOn: [storage]
 }
-
-resource principalBlobDataContributorAssignments 'Microsoft.Authorization/roleAssignments@2022-04-01' = [for principal in principals: {
-  scope: storageAccount
-  name: guid(storageAccountName, principal.id, 'ba92f5b4-2d11-453d-a403-e96b0029c9fe')
-  properties: {
-    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', 'ba92f5b4-2d11-453d-a403-e96b0029c9fe')
-    principalId: principal.id
-    principalType: principal.principalType
-  }
-}]
 
 resource aiServicesAccount 'Microsoft.CognitiveServices/accounts@2024-04-01-preview' existing = {
   name: aiServicesName

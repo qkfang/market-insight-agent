@@ -21,7 +21,8 @@ param secondaryModelDeploymentName string = 'gpt-4.1-mini'
 @description('Additional principals to grant Storage Blob Data Contributor on the storage account')
 param principals array = []
 
-var fabricAdminMembers = map(principals, p => p.id)
+@description('UPN/email addresses of Fabric capacity administrators')
+param fabricAdminMembers array = []
 
 @description('Fabric Data Agent MCP URL')
 param fabricMcpUrl string = ''

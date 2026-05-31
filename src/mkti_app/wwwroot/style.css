@@ -23,3 +23,11 @@ table.analysis tbody tr:hover { background: #eef6ff; }
 #ingest-meta { margin: 8px 0; color: #555; }
 #ingest-summary { margin: 8px 0; }
 #ingest-files { margin: 4px 0 12px; }
+#generate-summary { margin: 8px 0; }
+#delivery-controls { margin: 8px 0 16px; display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+#delivery-date { color: #555; }
+.markdown { line-height: 1.5; }
+.markdown h1, .markdown h2, .markdown h3 { margin-top: 1em; }
+.markdown ul, .markdown ol { padding-left: 1.5em; }
+.markdown table { border-collapse: collapse; }
+.markdown th, .markdown td { border: 1px solid #ddd; padding: 6px 10px; }

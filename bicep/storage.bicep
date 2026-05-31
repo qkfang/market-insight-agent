@@ -4,9 +4,6 @@ param location string
 @description('Storage account name')
 param storageAccountName string
 
-@description('Blob container name for noise logs')
-param logsContainerName string = 'noise-logs'
-
 resource storage 'Microsoft.Storage/storageAccounts@2023-05-01' = {
   name: storageAccountName
   location: location
@@ -20,8 +17,22 @@ resource storage 'Microsoft.Storage/storageAccounts@2023-05-01' = {
   }
 }
 
-resource logsContainer 'Microsoft.Storage/storageAccounts/blobServices/containers@2023-05-01' = {
-  name: '${storage.name}/default/${logsContainerName}'
+resource newsStoreContainer 'Microsoft.Storage/storageAccounts/blobServices/containers@2023-05-01' = {
+  name: '${storage.name}/default/news-store'
+  properties: {
+    publicAccess: 'None'
+  }
+}
+
+resource newsAnalysisContainer 'Microsoft.Storage/storageAccounts/blobServices/containers@2023-05-01' = {
+  name: '${storage.name}/default/news-analysis'
+  properties: {
+    publicAccess: 'None'
+  }
+}
+
+resource marketInsightContainer 'Microsoft.Storage/storageAccounts/blobServices/containers@2023-05-01' = {
+  name: '${storage.name}/default/market-insight'
   properties: {
     publicAccess: 'None'
   }
@@ -29,4 +40,3 @@ resource logsContainer 'Microsoft.Storage/storageAccounts/blobServices/container
 
 output storageAccountName string = storage.name
 output storageAccountId string = storage.id
-output logsContainerName string = logsContainer.name

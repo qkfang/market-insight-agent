@@ -3,8 +3,11 @@ targetScope = 'resourceGroup'
 @description('Azure location')
 param location string = resourceGroup().location
 
-@description('Base name for resources')
+@description('Short base name / abbreviation for resources (e.g. mkti)')
 param baseName string
+
+@description('Full project name used for Foundry and Fabric resources')
+param projectName string = 'market_insight'
 
 @description('SKU for App Service plan')
 @allowed([
@@ -12,20 +15,36 @@ param baseName string
   'B1'
   'S1'
 ])
-param appServiceSku string = 'S1'
+param skuName string = 'S1'
 
-@description('Blob container name for noise log files')
-param logsContainerName string = 'noise-logs'
+@description('Microsoft Fabric capacity SKU name')
+@allowed(['F2', 'F4', 'F8', 'F16', 'F32', 'F64', 'F128', 'F256', 'F512', 'F1024', 'F2048'])
+param fabricSkuName string = 'F2'
+
+@description('Primary AI model deployment name')
+param primaryModelDeploymentName string = 'gpt-4.1'
+
+@description('Secondary AI model deployment name')
+param secondaryModelDeploymentName string = 'gpt-4.1-mini'
+
+@description('Admin UPN/email addresses for the Fabric capacity')
+param fabricAdminMembers array = []
 
 @description('Additional principals to grant Storage Blob Data Contributor on the storage account')
 param principals array = []
 
 var uniqueSuffix = uniqueString(resourceGroup().id)
+var tags = { project: projectName }
 var logAnalyticsName = '${baseName}-law'
 var appInsightsName = '${baseName}-appi'
-var storageAccountName = toLower('${baseName}sa')
+var storageAccountName = toLower('${baseName}sa${take(uniqueSuffix, 4)}')
 var appServicePlanName = '${baseName}-plan'
 var webAppName = '${baseName}-web'
+var hubName = '${baseName}-hub'
+var aiProjectName = '${baseName}-proj'
+var aiServicesName = '${baseName}-ais'
+var keyVaultName = '${baseName}-kv-${take(uniqueSuffix, 4)}'
+var fabricCapacityName = '${baseName}-fabric'
 
 module monitoring 'monitoring.bicep' = {
   name: 'monitoring'
@@ -33,6 +52,7 @@ module monitoring 'monitoring.bicep' = {
     location: location
     logAnalyticsName: logAnalyticsName
     appInsightsName: appInsightsName
+    tags: tags
   }
 }
 
@@ -41,7 +61,31 @@ module storage 'storage.bicep' = {
   params: {
     location: location
     storageAccountName: storageAccountName
-    logsContainerName: logsContainerName
+  }
+}
+
+module foundry 'foundry.bicep' = {
+  name: 'foundry'
+  params: {
+    location: location
+    hubName: hubName
+    aiProjectName: aiProjectName
+    aiServicesName: aiServicesName
+    keyVaultName: keyVaultName
+    storageAccountId: storage.outputs.storageAccountId
+    appInsightsId: monitoring.outputs.appInsightsId
+    primaryModelDeploymentName: primaryModelDeploymentName
+    secondaryModelDeploymentName: secondaryModelDeploymentName
+  }
+}
+
+module fabric 'fabric.bicep' = {
+  name: 'fabric'
+  params: {
+    location: location
+    capacityName: fabricCapacityName
+    skuName: fabricSkuName
+    adminMembers: fabricAdminMembers
   }
 }
 
@@ -51,10 +95,11 @@ module appService 'appservice.bicep' = {
     location: location
     webAppName: webAppName
     appServicePlanName: appServicePlanName
-    appServiceSku: appServiceSku
+    appServiceSku: skuName
     appInsightsConnectionString: monitoring.outputs.appInsightsConnectionString
     storageAccountName: storageAccountName
-    logsContainerName: logsContainerName
+    aiProjectEndpoint: foundry.outputs.aiProjectEndpoint
+    primaryModelDeploymentName: foundry.outputs.primaryModelDeploymentName
   }
 }
 
@@ -83,5 +128,9 @@ resource principalBlobDataContributorAssignments 'Microsoft.Authorization/roleAs
 }]
 
 output webAppName string = appService.outputs.webAppName
+output webAppUrl string = appService.outputs.webAppUrl
 output storageAccountName string = storage.outputs.storageAccountName
-output logsContainerName string = storage.outputs.logsContainerName
+output appInsightsConnectionString string = monitoring.outputs.appInsightsConnectionString
+output azureAiProjectEndpoint string = foundry.outputs.aiProjectEndpoint
+output azureAiModelDeploymentName string = foundry.outputs.primaryModelDeploymentName
+output fabricCapacityName string = fabric.outputs.fabricCapacityName

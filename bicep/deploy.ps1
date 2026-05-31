@@ -1,12 +1,30 @@
 
-$appName = 'noise-capture'  # TODO: replace with your app name when using this template
-
-az group create --name "rg-$appName" --location 'westus3'
-
-az deployment group create --name "$appName-deploy" --resource-group "rg-$appName" --template-file './main.bicep' --parameters './main.bicepparam'
-
-$spObjectId = 'a6efe236-83c5-472b-a068-65006e369ad7'  # sp-demo-01
+$projectName    = 'market-insight'
+$baseName       = 'mkti'
+$location       = 'westus3'
 $subscriptionId = az account show --query 'id' -o tsv
-az role assignment create --assignee-object-id $spObjectId --assignee-principal-type ServicePrincipal --role 'Contributor' --scope "/subscriptions/$subscriptionId/resourceGroups/rg-$appName"
-az role assignment create --assignee-object-id $spObjectId --assignee-principal-type ServicePrincipal --role 'User Access Administrator' --scope "/subscriptions/$subscriptionId/resourceGroups/rg-$appName"
+$resourceGroup  = "rg-$projectName"
+
+az account set --subscription $subscriptionId
+
+az group create --name $resourceGroup --location $location
+
+$deployOutput = az deployment group create `
+  --name "$baseName-deploy" `
+  --resource-group $resourceGroup `
+  --template-file './main.bicep' `
+  --parameters './main.bicepparam' `
+  --query 'properties.outputs' `
+  -o json | ConvertFrom-Json
+
+Write-Host ""
+Write-Host "=== Deployment Outputs ===" -ForegroundColor Cyan
+Write-Host "Web App Name:                 $($deployOutput.webAppName.value)"
+Write-Host "Web App URL:                  $($deployOutput.webAppUrl.value)"
+Write-Host "Storage Account Name:         $($deployOutput.storageAccountName.value)"
+Write-Host "AppInsights Connection String: $($deployOutput.appInsightsConnectionString.value)"
+Write-Host "AZURE_AI_PROJECT_ENDPOINT:    $($deployOutput.azureAiProjectEndpoint.value)"
+Write-Host "AZURE_AI_MODEL_DEPLOYMENT_NAME: $($deployOutput.azureAiModelDeploymentName.value)"
+Write-Host "Fabric Capacity Name:         $($deployOutput.fabricCapacityName.value)"
+Write-Host "==========================" -ForegroundColor Cyan
 

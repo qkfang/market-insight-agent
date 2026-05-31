@@ -96,7 +96,18 @@ public sealed class BlobStorageService
 
     private string GetFallbackPath(string containerName, string blobName)
     {
-        var sanitizedBlob = blobName.Replace('/', Path.DirectorySeparatorChar);
-        return Path.Combine(_fallbackRoot, containerName, sanitizedBlob);
+        var sanitizedBlob = blobName.Replace('\\', '/');
+        var relativePath = sanitizedBlob
+            .Split('/', StringSplitOptions.RemoveEmptyEntries)
+            .Where(part => part != "." && part != "..")
+            .ToArray();
+        var combined = Path.Combine([_fallbackRoot, containerName, .. relativePath]);
+        var fullPath = Path.GetFullPath(combined);
+        var containerRoot = Path.GetFullPath(Path.Combine(_fallbackRoot, containerName)) + Path.DirectorySeparatorChar;
+
+        if (!fullPath.StartsWith(containerRoot, StringComparison.Ordinal))
+            throw new InvalidOperationException("Invalid blob path.");
+
+        return fullPath;
     }
 }

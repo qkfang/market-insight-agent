@@ -2,6 +2,7 @@ using System.ComponentModel;
 using System.Net.Http.Headers;
 using System.Text.Json;
 using System.Xml.Linq;
+using Microsoft.Extensions.Configuration;
 using mkti_app.Services;
 using ModelContextProtocol.Server;
 
@@ -17,13 +18,7 @@ public sealed class MarketInsightMcpTools
 
     private static readonly JsonSerializerOptions JsonOptions = new() { WriteIndented = false };
 
-    private static readonly string[] DefaultRssFeeds =
-    [
-        "https://feeds.bloomberg.com/markets/news.rss",
-        "https://www.mining.com/feed/",
-        "https://www.kitco.com/rss/news-kitco-metals.xml"
-    ];
-
+    private readonly string[] _defaultRssFeeds;
     private readonly BlobStorageService _blobStorageService;
     private readonly DocIntelligenceService _docIntelligenceService;
     private readonly FabricLakehouseService _fabricLakehouseService;
@@ -35,20 +30,23 @@ public sealed class MarketInsightMcpTools
         DocIntelligenceService docIntelligenceService,
         FabricLakehouseService fabricLakehouseService,
         BingSearchService bingSearchService,
-        IHttpClientFactory httpClientFactory)
+        IHttpClientFactory httpClientFactory,
+        IConfiguration configuration)
     {
         _blobStorageService = blobStorageService;
         _docIntelligenceService = docIntelligenceService;
         _fabricLakehouseService = fabricLakehouseService;
         _bingSearchService = bingSearchService;
         _httpClientFactory = httpClientFactory;
+        var appMcpUrl = configuration["APP_MCP_URL"] ?? "http://localhost:5001";
+        _defaultRssFeeds = [$"{appMcpUrl.TrimEnd('/')}/api/mock/rss"];
     }
 
     [McpServerTool(Name = "fetch_rss_feed"), Description("Download and parse a copper market RSS/Atom feed. Returns a JSON array of articles with title, url, publishDate and description.")]
     public async Task<string> FetchRssFeed(
         [Description("RSS feed URL. If omitted, the default copper market feeds are used.")] string? feedUrl = null)
     {
-        var feeds = string.IsNullOrWhiteSpace(feedUrl) ? DefaultRssFeeds : [feedUrl];
+        var feeds = string.IsNullOrWhiteSpace(feedUrl) ? _defaultRssFeeds : [feedUrl];
         var client = CreateClient();
         var articles = new List<RssArticle>();
 

@@ -210,6 +210,80 @@ public static class Apis
             });
         });
 
+        app.MapGet("/api/mock/rss", async (HttpContext context, IWebHostEnvironment env) =>
+        {
+            var jsonPath = Path.Combine(env.WebRootPath, "articles.json");
+            if (!File.Exists(jsonPath))
+                return Results.NotFound("articles.json not found");
+
+            var baseUrl = $"{context.Request.Scheme}://{context.Request.Host}";
+            var json = await File.ReadAllTextAsync(jsonPath);
+
+            List<MockArticle>? articles;
+            try
+            {
+                articles = System.Text.Json.JsonSerializer.Deserialize<List<MockArticle>>(
+                    json, new System.Text.Json.JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+            }
+            catch
+            {
+                articles = null;
+            }
+
+            if (articles is null || articles.Count == 0)
+                return Results.Content("<rss version=\"2.0\"><channel><title>Copper Market News</title></channel></rss>", "application/rss+xml");
+
+            var itemsXml = string.Join("\n", articles.Select(a =>
+                $"""
+                <item>
+                  <title><![CDATA[{a.Title}]]></title>
+                  <link>{baseUrl}/api/mock/article/{a.Id}</link>
+                  <pubDate>{a.PublishDate}</pubDate>
+                  <description><![CDATA[{a.Description}]]></description>
+                </item>
+                """));
+
+            var rss = $"""
+                <?xml version="1.0" encoding="UTF-8"?>
+                <rss version="2.0">
+                  <channel>
+                    <title>Copper Market News (Mock)</title>
+                    <link>{baseUrl}/api/mock/rss</link>
+                    <description>Mock copper market news articles for development and testing</description>
+                    <language>en-us</language>
+                    {itemsXml}
+                  </channel>
+                </rss>
+                """;
+
+            return Results.Content(rss, "application/rss+xml");
+        });
+
+        app.MapGet("/api/mock/article/{id}", async (string id, IWebHostEnvironment env) =>
+        {
+            var jsonPath = Path.Combine(env.WebRootPath, "articles.json");
+            if (!File.Exists(jsonPath))
+                return Results.NotFound("articles.json not found");
+
+            var json = await File.ReadAllTextAsync(jsonPath);
+            List<MockArticle>? articles;
+            try
+            {
+                articles = System.Text.Json.JsonSerializer.Deserialize<List<MockArticle>>(
+                    json, new System.Text.Json.JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+            }
+            catch
+            {
+                articles = null;
+            }
+
+            var article = articles?.FirstOrDefault(a => a.Id == id);
+            if (article is null)
+                return Results.NotFound($"Article '{id}' not found");
+
+            return Results.Content(article.HtmlContent, "text/html");
+        });
+
         app.MapGet("/api/subscription", async (HttpContext context) =>
         {
             var userId = ResolveUserId(context);
@@ -335,6 +409,8 @@ public static class Apis
         return text.Substring(start, end - start + 1);
     }
 }
+
+public sealed record MockArticle(string Id, string Title, string PublishDate, string Description, string HtmlContent);
 
 public sealed record SubscriptionRequest(IReadOnlyList<string> Markets, IReadOnlyList<string> Items)
 {

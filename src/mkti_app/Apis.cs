@@ -225,7 +225,7 @@ public static class Apis
                 articles = System.Text.Json.JsonSerializer.Deserialize<List<MockArticle>>(
                     json, new System.Text.Json.JsonSerializerOptions { PropertyNameCaseInsensitive = true });
             }
-            catch
+            catch (System.Text.Json.JsonException)
             {
                 articles = null;
             }
@@ -272,7 +272,7 @@ public static class Apis
                 articles = System.Text.Json.JsonSerializer.Deserialize<List<MockArticle>>(
                     json, new System.Text.Json.JsonSerializerOptions { PropertyNameCaseInsensitive = true });
             }
-            catch
+            catch (System.Text.Json.JsonException)
             {
                 articles = null;
             }

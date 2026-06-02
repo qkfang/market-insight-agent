@@ -1,23 +1,11 @@
 @description('Azure location')
 param location string
 
-@description('AI Foundry hub workspace name')
-param hubName string
-
-@description('AI Foundry project workspace name')
-param aiProjectName string
-
-@description('Azure AI Services account name')
+@description('AI Services account name (serves as Foundry hub)')
 param aiServicesName string
 
-@description('Key Vault name (required by AI Foundry hub)')
-param keyVaultName string
-
-@description('Storage account resource ID for AI Foundry hub')
-param storageAccountId string
-
-@description('Application Insights resource ID for AI Foundry hub')
-param appInsightsId string
+@description('AI Foundry project name')
+param aiProjectName string
 
 @description('Primary model deployment name (gpt-4.1)')
 param primaryModelDeploymentName string = 'gpt-4.1'
@@ -25,39 +13,42 @@ param primaryModelDeploymentName string = 'gpt-4.1'
 @description('Secondary model deployment name (gpt-4.1-mini)')
 param secondaryModelDeploymentName string = 'gpt-4.1-mini'
 
-// Key Vault required by AI Foundry hub
-resource keyVault 'Microsoft.KeyVault/vaults@2023-07-01' = {
-  name: keyVaultName
-  location: location
-  properties: {
-    sku: {
-      family: 'A'
-      name: 'standard'
-    }
-    tenantId: subscription().tenantId
-    enableSoftDelete: true
-    softDeleteRetentionInDays: 7
-    enableRbacAuthorization: true
-  }
-}
-
-// Azure AI Services account (provides OpenAI model deployments)
-resource aiServices 'Microsoft.CognitiveServices/accounts@2024-04-01-preview' = {
+// Azure AI Services account with project management enabled
+resource aiHub 'Microsoft.CognitiveServices/accounts@2025-10-01-preview' = {
   name: aiServicesName
   location: location
-  kind: 'AIServices'
+  identity: {
+    type: 'SystemAssigned'
+  }
   sku: {
     name: 'S0'
   }
+  kind: 'AIServices'
   properties: {
+    allowProjectManagement: true
     customSubDomainName: aiServicesName
     publicNetworkAccess: 'Enabled'
+    disableLocalAuth: true
+    networkAcls: {
+      defaultAction: 'Allow'
+    }
   }
 }
 
+// Azure AI Foundry Project
+resource aiProject 'Microsoft.CognitiveServices/accounts/projects@2025-06-01' = {
+  parent: aiHub
+  name: aiProjectName
+  location: location
+  identity: {
+    type: 'SystemAssigned'
+  }
+  properties: {}
+}
+
 // gpt-4.1 model deployment
-resource gpt41Deployment 'Microsoft.CognitiveServices/accounts/deployments@2024-04-01-preview' = {
-  parent: aiServices
+resource gpt41Deployment 'Microsoft.CognitiveServices/accounts/deployments@2024-10-01' = {
+  parent: aiHub
   name: primaryModelDeploymentName
   sku: {
     name: 'GlobalStandard'
@@ -67,13 +58,16 @@ resource gpt41Deployment 'Microsoft.CognitiveServices/accounts/deployments@2024-
     model: {
       format: 'OpenAI'
       name: 'gpt-4.1'
+      version: '2025-04-14'
     }
+    versionUpgradeOption: 'OnceNewDefaultVersionAvailable'
+    raiPolicyName: 'Microsoft.DefaultV2'
   }
 }
 
 // gpt-4.1-mini model deployment
-resource gpt41MiniDeployment 'Microsoft.CognitiveServices/accounts/deployments@2024-04-01-preview' = {
-  parent: aiServices
+resource gpt41MiniDeployment 'Microsoft.CognitiveServices/accounts/deployments@2024-10-01' = {
+  parent: aiHub
   name: secondaryModelDeploymentName
   dependsOn: [gpt41Deployment]
   sku: {
@@ -84,43 +78,15 @@ resource gpt41MiniDeployment 'Microsoft.CognitiveServices/accounts/deployments@2
     model: {
       format: 'OpenAI'
       name: 'gpt-4.1-mini'
+      version: '2025-04-14'
     }
+    versionUpgradeOption: 'OnceNewDefaultVersionAvailable'
+    raiPolicyName: 'Microsoft.DefaultV2'
   }
 }
 
-// Azure AI Foundry Hub
-resource hub 'Microsoft.MachineLearningServices/workspaces@2024-07-01-preview' = {
-  name: hubName
-  location: location
-  kind: 'Hub'
-  identity: {
-    type: 'SystemAssigned'
-  }
-  properties: {
-    friendlyName: hubName
-    storageAccount: storageAccountId
-    keyVault: keyVault.id
-    applicationInsights: appInsightsId
-    publicNetworkAccess: 'Enabled'
-  }
-}
-
-// Azure AI Foundry Project
-resource aiProject 'Microsoft.MachineLearningServices/workspaces@2024-07-01-preview' = {
-  name: aiProjectName
-  location: location
-  kind: 'Project'
-  identity: {
-    type: 'SystemAssigned'
-  }
-  properties: {
-    friendlyName: aiProjectName
-    hubResourceId: hub.id
-    publicNetworkAccess: 'Enabled'
-  }
-}
-
-output aiProjectEndpoint string = aiProject.properties.discoveryUrl
-output aiServicesEndpoint string = aiServices.properties.endpoint
+output aiProjectEndpoint string = aiProject.properties.endpoints['AI Foundry API']
+output aiServicesEndpoint string = aiHub.properties.endpoint
 output primaryModelDeploymentName string = gpt41Deployment.name
 output secondaryModelDeploymentName string = gpt41MiniDeployment.name
+output aiHubPrincipalId string = aiHub.identity.principalId

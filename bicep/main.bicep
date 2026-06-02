@@ -37,17 +37,14 @@ param bingSearchApiKey string = ''
 @description('Bing Search v7 endpoint')
 param bingSearchEndpoint string = 'https://api.bing.microsoft.com/'
 
-var uniqueSuffix = uniqueString(resourceGroup().id)
 var tags = { project: projectName }
 var logAnalyticsName = '${baseName}-law'
 var appInsightsName = '${baseName}-appi'
 var storageAccountName = toLower('${baseName}sa')
 var appServicePlanName = '${baseName}-plan'
 var webAppName = '${baseName}-web'
-var hubName = '${baseName}-hub'
 var aiProjectName = '${baseName}-proj'
 var aiServicesName = '${baseName}-ais'
-var keyVaultName = '${baseName}-kv'
 var fabricCapacityName = '${baseName}fabric'
 
 module monitoring 'monitoring.bicep' = {
@@ -72,12 +69,8 @@ module foundry 'foundry.bicep' = {
   name: 'foundry'
   params: {
     location: location
-    hubName: hubName
-    aiProjectName: aiProjectName
     aiServicesName: aiServicesName
-    keyVaultName: keyVaultName
-    storageAccountId: storage.outputs.storageAccountId
-    appInsightsId: monitoring.outputs.appInsightsId
+    aiProjectName: aiProjectName
     primaryModelDeploymentName: primaryModelDeploymentName
     secondaryModelDeploymentName: secondaryModelDeploymentName
   }

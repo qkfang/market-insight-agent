@@ -85,7 +85,7 @@ public sealed class MarketInsightMcpTools
         }
     }
 
-    [McpServerTool(Name = "store_news_article"), Description("Store a news article to the Azure Blob 'news-store' container and the Fabric Lakehouse 'news_store' folder. Returns the storage path.")]
+    [McpServerTool(Name = "store_news_article"), Description("Store a news article to the Azure Blob 'news-store' container and the Fabric Lakehouse 'news-store' folder. Returns the storage path.")]
     public async Task<string> StoreNewsArticle(
         [Description("Target filename, e.g. mining-com-2026-01-01.html")] string filename,
         [Description("Article content (html or text)")] string content,
@@ -100,7 +100,7 @@ public sealed class MarketInsightMcpTools
         await _blobStorageService.WriteTextAsync("news-store", filename, safeContent, resolvedContentType);
 
         var fabricPath = await _fabricLakehouseService.UploadFileAsync(
-            "news_store", filename, System.Text.Encoding.UTF8.GetBytes(safeContent));
+            "news-store", filename, System.Text.Encoding.UTF8.GetBytes(safeContent));
 
         return JsonSerializer.Serialize(new
         {
@@ -189,7 +189,7 @@ public sealed class MarketInsightMcpTools
         return JsonSerializer.Serialize(parsed, JsonOptions);
     }
 
-    [McpServerTool(Name = "store_news_analysis"), Description("Store the structured news analysis JSON to the news-analysis blob container and the Fabric news_analysis folder. The blob name is {filename}.json.")]
+    [McpServerTool(Name = "store_news_analysis"), Description("Store the structured news analysis JSON to the news-analysis blob container and the Fabric news-analysis folder. The blob name is {filename}.json.")]
     public async Task<string> StoreNewsAnalysis(
         [Description("Original article filename, e.g. source/news-2026-01-01.html")] string filename,
         [Description("Analysis content as a JSON string with title, date, source and markdownContent fields")] string analysisJson)
@@ -201,7 +201,7 @@ public sealed class MarketInsightMcpTools
 
         var blobName = $"{filename}.json";
         await _blobStorageService.WriteTextAsync(NewsAnalysisContainer, blobName, analysisJson);
-        var fabricStored = await _fabricLakehouseService.WriteFileAsync($"news_analysis/{blobName}", analysisJson);
+        var fabricStored = await _fabricLakehouseService.WriteFileAsync($"news-analysis/{blobName}", analysisJson);
 
         return $"Stored analysis as {blobName} (blob: yes, fabric: {(fabricStored ? "yes" : "skipped")}).";
     }
@@ -379,7 +379,7 @@ public sealed class MarketInsightMcpTools
         }, JsonOptions);
     }
 
-    [McpServerTool(Name = "store_market_insight"), Description("Store the daily copper market insight markdown to the market-insight blob container as {date}_copper_insight.md and to the Fabric Lakehouse market_insight/ folder. Returns JSON with the blob URL, filename and date.")]
+    [McpServerTool(Name = "store_market_insight"), Description("Store the daily copper market insight markdown to the market-insight blob container as {date}_copper_insight.md and to the Fabric Lakehouse market-insight/ folder. Returns JSON with the blob URL, filename and date.")]
     public async Task<string> StoreMarketInsight(
         [Description("Insight report content as markdown")] string content,
         [Description("Report date in yyyy-MM-dd format. Defaults to today's UTC date when omitted.")] string? date = null)
@@ -391,7 +391,7 @@ public sealed class MarketInsightMcpTools
         var safeContent = content ?? string.Empty;
 
         await _blobStorageService.WriteTextAsync(MarketInsightContainer, filename, safeContent, "text/markdown");
-        await _fabricLakehouseService.WriteFileAsync($"market_insight/{filename}", safeContent);
+        await _fabricLakehouseService.WriteFileAsync($"market-insight/{filename}", safeContent);
 
         return JsonSerializer.Serialize(new
         {

@@ -52,7 +52,7 @@ resource gpt41Deployment 'Microsoft.CognitiveServices/accounts/deployments@2024-
   name: primaryModelDeploymentName
   sku: {
     name: 'GlobalStandard'
-    capacity: 10
+    capacity: 500
   }
   properties: {
     model: {
@@ -72,7 +72,7 @@ resource gpt41MiniDeployment 'Microsoft.CognitiveServices/accounts/deployments@2
   dependsOn: [gpt41Deployment]
   sku: {
     name: 'GlobalStandard'
-    capacity: 10
+    capacity: 500
   }
   properties: {
     model: {

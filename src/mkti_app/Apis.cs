@@ -16,27 +16,20 @@ public static class Apis
     {
         app.MapGet("/api/news/ingest", async () =>
         {
-            try
-            {
-                var before = await blobStorageService.ListBlobNamesAsync("news-store");
-                var result = await newsIngestionAgent.RunAsync("Download latest copper market news from RSS feeds and store them");
-                var after = await blobStorageService.ListBlobNamesAsync("news-store");
+            var before = await blobStorageService.ListBlobNamesAsync("news-store");
+            var result = await newsIngestionAgent.RunAsync("Download latest copper market news from RSS feeds and store them");
+            var after = await blobStorageService.ListBlobNamesAsync("news-store");
 
-                var delta = after.Count - before.Count;
-                var articlesStored = Math.Max(0, delta);
+            var delta = after.Count - before.Count;
+            var articlesStored = Math.Max(0, delta);
 
-                return Results.Json(new
-                {
-                    success = true,
-                    articlesStored,
-                    filenames = after,
-                    message = result
-                });
-            }
-            catch (Exception ex)
+            return Results.Json(new
             {
-                return Results.Json(new { success = false, articlesStored = 0, message = ex.Message });
-            }
+                success = true,
+                articlesStored,
+                filenames = after,
+                message = result
+            });
         });
 
         app.MapGet("/api/news/list", async () =>
@@ -47,71 +40,53 @@ public static class Apis
 
         app.MapGet("/api/news/analyze", async () =>
         {
-            try
+            var before = new HashSet<string>(
+                await blobStorageService.ListBlobNamesAsync("news-analysis"),
+                StringComparer.OrdinalIgnoreCase);
+
+            var result = await newsAnalysisAgent.RunAsync(
+                "Analyze all unprocessed news articles and extract structured content.");
+
+            var afterNames = await blobStorageService.ListBlobNamesAsync("news-analysis");
+            var results = new List<object>();
+            foreach (var name in afterNames.Where(n => !before.Contains(n)))
             {
-                var before = new HashSet<string>(
-                    await blobStorageService.ListBlobNamesAsync("news-analysis"),
-                    StringComparer.OrdinalIgnoreCase);
-
-                var result = await newsAnalysisAgent.RunAsync(
-                    "Analyze all unprocessed news articles and extract structured content.");
-
-                var afterNames = await blobStorageService.ListBlobNamesAsync("news-analysis");
-                var results = new List<object>();
-                foreach (var name in afterNames.Where(n => !before.Contains(n)))
-                {
-                    var content = await blobStorageService.ReadTextAsync("news-analysis", name);
-                    int? wordCount = TryGetWordCount(content);
-                    results.Add(new { filename = name, wordCount });
-                }
-
-                return Results.Json(new
-                {
-                    success = true,
-                    articlesAnalyzed = results.Count,
-                    results,
-                    result
-                });
+                var content = await blobStorageService.ReadTextAsync("news-analysis", name);
+                int? wordCount = TryGetWordCount(content);
+                results.Add(new { filename = name, wordCount });
             }
-            catch (Exception ex)
+
+            return Results.Json(new
             {
-                return Results.Json(new { success = false, status = "error", error = ex.Message });
-            }
+                success = true,
+                articlesAnalyzed = results.Count,
+                results,
+                result
+            });
         });
 
         app.MapGet("/api/news/analysis", async () =>
         {
-            try
+            var names = await blobStorageService.ListBlobNamesAsync("news-analysis");
+            var articles = new List<object>();
+            foreach (var name in names)
             {
-                var names = await blobStorageService.ListBlobNamesAsync("news-analysis");
-                var articles = new List<object>();
-                foreach (var name in names)
+                var content = await blobStorageService.ReadTextAsync("news-analysis", name);
+                string? title = null, date = null, source = null;
+                int? wordCount = null;
+                if (!string.IsNullOrWhiteSpace(content))
                 {
-                    var content = await blobStorageService.ReadTextAsync("news-analysis", name);
-                    string? title = null, date = null, source = null;
-                    int? wordCount = null;
-                    if (!string.IsNullOrWhiteSpace(content))
-                    {
-                        try
-                        {
-                            using var doc = System.Text.Json.JsonDocument.Parse(content);
-                            var root = doc.RootElement;
-                            if (root.TryGetProperty("title", out var t)) title = t.GetString();
-                            if (root.TryGetProperty("date", out var d)) date = d.GetString();
-                            if (root.TryGetProperty("source", out var s)) source = s.GetString();
-                            if (root.TryGetProperty("wordCount", out var w) && w.TryGetInt32(out var wc)) wordCount = wc;
-                        }
-                        catch (System.Text.Json.JsonException) { }
-                    }
-                    articles.Add(new { filename = name, title, date, source, wordCount });
+                    using var doc = System.Text.Json.JsonDocument.Parse(content);
+                    var root = doc.RootElement;
+                    if (root.TryGetProperty("title", out var t)) title = t.GetString();
+                    if (root.TryGetProperty("date", out var d)) date = d.GetString();
+                    if (root.TryGetProperty("source", out var s)) source = s.GetString();
+                    if (root.TryGetProperty("wordCount", out var w) && w.TryGetInt32(out var wc)) wordCount = wc;
                 }
+                articles.Add(new { filename = name, title, date, source, wordCount });
+            }
 
-                return Results.Json(new { status = "ok", articles });
-            }
-            catch (Exception ex)
-            {
-                return Results.Json(new { status = "error", error = ex.Message });
-            }
+            return Results.Json(new { status = "ok", articles });
         });
 
         app.MapGet("/api/news/analysis/content", async (string name) =>
@@ -128,55 +103,41 @@ public static class Apis
 
         app.MapGet("/api/market/research", async () =>
         {
-            try
+            var result = await marketResearchAgent.RunAsync(
+                "Research the current copper market sentiment based on latest news and Bing search results");
+
+            var (sentiment, confidence, keyDrivers, summary) = ParseSentiment(result);
+            var timestamp = DateTime.UtcNow.ToString("o");
+
+            var researchDate = DateTime.UtcNow.ToString("yyyy-MM-dd");
+            var researchJson = System.Text.Json.JsonSerializer.Serialize(
+                new { sentiment, confidence, keyDrivers, summary, timestamp });
+            await blobStorageService.WriteTextAsync(
+                "market-research", $"{researchDate}_copper_research.json", researchJson, "application/json");
+
+            return Results.Json(new
             {
-                var result = await marketResearchAgent.RunAsync(
-                    "Research the current copper market sentiment based on latest news and Bing search results");
-
-                var (sentiment, confidence, keyDrivers, summary) = ParseSentiment(result);
-                var timestamp = DateTime.UtcNow.ToString("o");
-
-                var researchDate = DateTime.UtcNow.ToString("yyyy-MM-dd");
-                var researchJson = System.Text.Json.JsonSerializer.Serialize(
-                    new { sentiment, confidence, keyDrivers, summary, timestamp });
-                await blobStorageService.WriteTextAsync(
-                    "market-research", $"{researchDate}_copper_research.json", researchJson, "application/json");
-
-                return Results.Json(new
-                {
-                    status = "ok",
-                    sentiment,
-                    confidence,
-                    keyDrivers,
-                    summary,
-                    timestamp
-                });
-            }
-            catch (Exception ex)
-            {
-                return Results.Json(new { status = "error", error = ex.Message });
-            }
+                status = "ok",
+                sentiment,
+                confidence,
+                keyDrivers,
+                summary,
+                timestamp
+            });
         });
 
         app.MapGet("/api/insight/generate", async () =>
         {
-            try
+            await insightGenerationAgent.RunAsync("Generate today's copper market insight report and store it in markdown.");
+            var latest = await ReadLatestInsightAsync(blobStorageService);
+            var preview = latest.Content.Length > 500 ? latest.Content[..500] : latest.Content;
+            return Results.Json(new
             {
-                await insightGenerationAgent.RunAsync("Generate today's copper market insight report and store it in markdown.");
-                var latest = await ReadLatestInsightAsync(blobStorageService);
-                var preview = latest.Content.Length > 500 ? latest.Content[..500] : latest.Content;
-                return Results.Json(new
-                {
-                    success = true,
-                    date = latest.Date,
-                    filename = latest.Filename,
-                    preview
-                });
-            }
-            catch (Exception ex)
-            {
-                return Results.Json(new { success = false, date = string.Empty, filename = string.Empty, preview = string.Empty, error = ex.Message });
-            }
+                success = true,
+                date = latest.Date,
+                filename = latest.Filename,
+                preview
+            });
         });
 
         app.MapGet("/api/insight/latest", async () =>
@@ -257,13 +218,9 @@ public static class Apis
     {
         if (string.IsNullOrWhiteSpace(analysisJson))
             return null;
-        try
-        {
-            using var doc = System.Text.Json.JsonDocument.Parse(analysisJson);
-            if (doc.RootElement.TryGetProperty("wordCount", out var w) && w.TryGetInt32(out var wc))
-                return wc;
-        }
-        catch (System.Text.Json.JsonException) { }
+        using var doc = System.Text.Json.JsonDocument.Parse(analysisJson);
+        if (doc.RootElement.TryGetProperty("wordCount", out var w) && w.TryGetInt32(out var wc))
+            return wc;
         return null;
     }
     private static (string sentiment, double confidence, string[] keyDrivers, string summary) ParseSentiment(string? agentOutput)
@@ -277,46 +234,39 @@ public static class Apis
         if (json is null)
             return (sentiment, confidence, keyDrivers, summary);
 
-        try
+        using var doc = System.Text.Json.JsonDocument.Parse(json);
+        var root = doc.RootElement;
+
+        if (root.TryGetProperty("sentiment", out var s) && s.ValueKind == System.Text.Json.JsonValueKind.String)
         {
-            using var doc = System.Text.Json.JsonDocument.Parse(json);
-            var root = doc.RootElement;
-
-            if (root.TryGetProperty("sentiment", out var s) && s.ValueKind == System.Text.Json.JsonValueKind.String)
-            {
-                var value = s.GetString();
-                if (!string.IsNullOrWhiteSpace(value))
-                    sentiment = value.Trim().ToLowerInvariant();
-            }
-
-            if (root.TryGetProperty("confidence", out var c))
-            {
-                if (c.ValueKind == System.Text.Json.JsonValueKind.Number && c.TryGetDouble(out var cv))
-                    confidence = cv;
-                else if (c.ValueKind == System.Text.Json.JsonValueKind.String
-                    && double.TryParse(c.GetString(), System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out var cs))
-                    confidence = cs;
-            }
-
-            if (root.TryGetProperty("keyDrivers", out var k) && k.ValueKind == System.Text.Json.JsonValueKind.Array)
-            {
-                keyDrivers = k.EnumerateArray()
-                    .Select(e => e.ValueKind == System.Text.Json.JsonValueKind.String ? e.GetString() : e.ToString())
-                    .Where(v => !string.IsNullOrWhiteSpace(v))
-                    .Select(v => v!)
-                    .ToArray();
-            }
-
-            if (root.TryGetProperty("summary", out var sum) && sum.ValueKind == System.Text.Json.JsonValueKind.String)
-            {
-                var value = sum.GetString();
-                if (!string.IsNullOrWhiteSpace(value))
-                    summary = value;
-            }
+            var value = s.GetString();
+            if (!string.IsNullOrWhiteSpace(value))
+                sentiment = value.Trim().ToLowerInvariant();
         }
-        catch (System.Text.Json.JsonException)
+
+        if (root.TryGetProperty("confidence", out var c))
         {
-            // Fall back to defaults / raw output if the agent did not return valid JSON.
+            if (c.ValueKind == System.Text.Json.JsonValueKind.Number && c.TryGetDouble(out var cv))
+                confidence = cv;
+            else if (c.ValueKind == System.Text.Json.JsonValueKind.String
+                && double.TryParse(c.GetString(), System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out var cs))
+                confidence = cs;
+        }
+
+        if (root.TryGetProperty("keyDrivers", out var k) && k.ValueKind == System.Text.Json.JsonValueKind.Array)
+        {
+            keyDrivers = k.EnumerateArray()
+                .Select(e => e.ValueKind == System.Text.Json.JsonValueKind.String ? e.GetString() : e.ToString())
+                .Where(v => !string.IsNullOrWhiteSpace(v))
+                .Select(v => v!)
+                .ToArray();
+        }
+
+        if (root.TryGetProperty("summary", out var sum) && sum.ValueKind == System.Text.Json.JsonValueKind.String)
+        {
+            var value = sum.GetString();
+            if (!string.IsNullOrWhiteSpace(value))
+                summary = value;
         }
 
         return (sentiment, confidence, keyDrivers, summary);
@@ -350,16 +300,9 @@ public sealed record SubscriptionRequest(IReadOnlyList<string> Markets, IReadOnl
         if (string.IsNullOrWhiteSpace(json))
             return new SubscriptionRequest([], []);
 
-        try
-        {
-            var parsed = System.Text.Json.JsonSerializer.Deserialize<SubscriptionRequest>(
-                json,
-                new System.Text.Json.JsonSerializerOptions { PropertyNameCaseInsensitive = true });
-            return new SubscriptionRequest(parsed?.Markets ?? [], parsed?.Items ?? []);
-        }
-        catch (System.Text.Json.JsonException)
-        {
-            return new SubscriptionRequest([], []);
-        }
+        var parsed = System.Text.Json.JsonSerializer.Deserialize<SubscriptionRequest>(
+            json,
+            new System.Text.Json.JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+        return new SubscriptionRequest(parsed?.Markets ?? [], parsed?.Items ?? []);
     }
 }

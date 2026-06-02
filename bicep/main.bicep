@@ -30,10 +30,6 @@ param fabricMcpUrl string = ''
 var fabricLakehouseWorkspaceId = ''
 var fabricLakehouseId = ''
 
-@description('Bing Search v7 API key')
-@secure()
-param bingSearchApiKey string = ''
-
 @description('Bing Search v7 endpoint')
 param bingSearchEndpoint string = 'https://api.bing.microsoft.com/'
 
@@ -45,6 +41,7 @@ var appServicePlanName = '${baseName}-plan'
 var webAppName = '${baseName}-web'
 var aiProjectName = '${baseName}-proj'
 var aiServicesName = '${baseName}-ais'
+var bingSearchName = '${baseName}-bing'
 var fabricCapacityName = '${baseName}fabric'
 
 module monitoring 'monitoring.bicep' = {
@@ -77,6 +74,13 @@ module foundry 'foundry.bicep' = {
   }
 }
 
+module bing 'bing.bicep' = {
+  name: 'bing'
+  params: {
+    bingSearchName: bingSearchName
+  }
+}
+
 module fabric 'fabric.bicep' = {
   name: 'fabric'
   params: {
@@ -102,7 +106,7 @@ module appService 'appservice.bicep' = {
     fabricMcpUrl: fabricMcpUrl
     fabricLakehouseWorkspaceId: fabricLakehouseWorkspaceId
     fabricLakehouseId: fabricLakehouseId
-    bingSearchApiKey: bingSearchApiKey
+    bingSearchApiKey: bing.outputs.apiKey
     bingSearchEndpoint: bingSearchEndpoint
   }
 }
@@ -116,6 +120,17 @@ module storageRoles 'storageroles.bicep' = {
     principals: principals
   }
   dependsOn: [storage]
+}
+
+module foundryRoles 'foundryroles.bicep' = {
+  name: 'foundryroles'
+  params: {
+    aiServicesName: aiServicesName
+    aiProjectName: aiProjectName
+    webAppPrincipalId: appService.outputs.principalId
+    webAppName: webAppName
+    principals: principals
+  }
 }
 
 resource aiServicesAccount 'Microsoft.CognitiveServices/accounts@2024-04-01-preview' existing = {

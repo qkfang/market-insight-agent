@@ -23,14 +23,14 @@ jobs:
           creds: ${{ secrets.AZURE_CREDENTIALS }}
 
     #   - name: Create Resource Group
-    #     run: az group create --name 'rg-${{ vars.PROJECT_NAME }}' --location 'eastus2'
+    #     run: az group create --name 'rg-market-insight' --location 'eastus2'
 
       - name: Deploy Bicep
         working-directory: bicep
         run: |
           az deployment group create \
-            --name '${{ vars.PROJECT_NAME }}-dev' \
-            --resource-group 'rg-${{ vars.PROJECT_NAME }}' \
+            --name 'market-insight-dev' \
+            --resource-group 'rg-market-insight' \
             --template-file './main.bicep' \
             --parameters './main.bicepparam' \
-            baseName='${{ vars.PROJECT_NAME_ABBR }}'
+            baseName='mkti'

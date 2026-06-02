@@ -110,10 +110,13 @@ public static class Apis
             var timestamp = DateTime.UtcNow.ToString("o");
 
             var researchDate = DateTime.UtcNow.ToString("yyyy-MM-dd");
+            var researchFilename = $"{researchDate}_copper_research.json";
             var researchJson = System.Text.Json.JsonSerializer.Serialize(
                 new { sentiment, confidence, keyDrivers, summary, timestamp });
             await blobStorageService.WriteTextAsync(
-                "market-research", $"{researchDate}_copper_research.json", researchJson, "application/json");
+                "market-research", researchFilename, researchJson, "application/json");
+            await fabricLakehouseService.WriteFileAsync(
+                $"market-research/{researchFilename}", researchJson);
 
             return Results.Json(new
             {

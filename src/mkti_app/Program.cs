@@ -49,7 +49,11 @@ var fabricMcpUrl = builder.Configuration["FABRIC_MCP_URL"] ?? string.Empty;
 var bingSearchApiKey = builder.Configuration["BING_SEARCH_API_KEY"] ?? string.Empty;
 var bingSearchEndpoint = builder.Configuration["BING_SEARCH_ENDPOINT"] ?? "https://api.bing.microsoft.com/";
 
-var credential = new DefaultAzureCredential();
+var tenantId = builder.Configuration["AZURE_TENANT_ID"] ?? string.Empty;
+var credential = new DefaultAzureCredential(
+    string.IsNullOrWhiteSpace(tenantId)
+        ? null
+        : new DefaultAzureCredentialOptions { TenantId = tenantId });
 
 builder.Services.AddSingleton(sp => new BlobStorageService(
     storageAccountName,

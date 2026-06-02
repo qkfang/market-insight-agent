@@ -4,9 +4,13 @@ param location string
 @description('Storage account name')
 param storageAccountName string
 
+@description('Resource tags')
+param tags object = {}
+
 resource storage 'Microsoft.Storage/storageAccounts@2023-05-01' = {
   name: storageAccountName
   location: location
+  tags: tags
   sku: {
     name: 'Standard_LRS'
   }
@@ -14,6 +18,7 @@ resource storage 'Microsoft.Storage/storageAccounts@2023-05-01' = {
   properties: {
     supportsHttpsTrafficOnly: true
     allowBlobPublicAccess: false
+    publicNetworkAccess: 'Enabled'
   }
 }
 

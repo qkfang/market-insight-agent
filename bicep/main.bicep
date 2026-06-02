@@ -62,6 +62,7 @@ module storage 'storage.bicep' = {
   params: {
     location: location
     storageAccountName: storageAccountName
+    tags: tags
   }
 }
 

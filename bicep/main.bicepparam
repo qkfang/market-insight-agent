@@ -15,3 +15,6 @@ param fabricAdminMembers = [
   'fabric@MngEnvMCAP951655.onmicrosoft.com'
 ]
 
+param fabricLakehouseWorkspaceId = 'b4b2a30e-7ca8-4843-8dd8-bf84e283e025'
+param fabricLakehouseId = '4d1ce629-360a-4b24-aa5e-04f81a76c81a'
+

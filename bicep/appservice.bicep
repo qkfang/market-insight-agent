@@ -25,9 +25,6 @@ param primaryModelDeploymentName string
 @description('Azure Document Intelligence endpoint')
 param docIntelligenceEndpoint string = ''
 
-@description('Fabric Data Agent MCP URL')
-param fabricMcpUrl string = ''
-
 @description('Fabric Lakehouse workspace ID')
 param fabricLakehouseWorkspaceId string = ''
 
@@ -87,6 +84,10 @@ resource webApp 'Microsoft.Web/sites@2023-12-01' = {
           value: primaryModelDeploymentName
         }
         {
+          name: 'AZURE_TENANT_ID'
+          value: subscription().tenantId
+        }
+        {
           name: 'AZURE_STORAGE_ACCOUNT_NAME'
           value: storageAccountName
         }
@@ -100,7 +101,7 @@ resource webApp 'Microsoft.Web/sites@2023-12-01' = {
         }
         {
           name: 'FABRIC_MCP_URL'
-          value: fabricMcpUrl
+          value: 'https://${webAppName}.azurewebsites.net'
         }
         {
           name: 'FABRIC_LAKEHOUSE_WORKSPACE_ID'

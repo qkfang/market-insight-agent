@@ -24,11 +24,11 @@ param principals array = []
 @description('UPN/email addresses of Fabric capacity administrators')
 param fabricAdminMembers array = []
 
-@description('Fabric Data Agent MCP URL')
-param fabricMcpUrl string = ''
+@description('Fabric Lakehouse workspace ID')
+param fabricLakehouseWorkspaceId string = ''
 
-var fabricLakehouseWorkspaceId = ''
-var fabricLakehouseId = ''
+@description('Fabric Lakehouse ID')
+param fabricLakehouseId string = ''
 
 @description('Bing Search v7 endpoint')
 param bingSearchEndpoint string = 'https://api.bing.microsoft.com/'
@@ -103,7 +103,6 @@ module appService 'appservice.bicep' = {
     aiProjectEndpoint: foundry.outputs.aiProjectEndpoint
     primaryModelDeploymentName: foundry.outputs.primaryModelDeploymentName
     docIntelligenceEndpoint: foundry.outputs.aiServicesEndpoint
-    fabricMcpUrl: fabricMcpUrl
     fabricLakehouseWorkspaceId: fabricLakehouseWorkspaceId
     fabricLakehouseId: fabricLakehouseId
     bingSearchApiKey: bing.outputs.apiKey

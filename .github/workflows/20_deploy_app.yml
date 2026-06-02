@@ -48,6 +48,6 @@ jobs:
           inlineScript: |
             az webapp deploy \
               --resource-group rg-market-insight \
-              --name market-insight-web \
+              --name mkti-web \
               --src-path ${{ github.workspace }}/app.zip \
               --type zip

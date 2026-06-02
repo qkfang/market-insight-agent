@@ -47,7 +47,7 @@ jobs:
         with:
           inlineScript: |
             az webapp deploy \
-              --resource-group rg-${{ vars.PROJECT_NAME }} \
-              --name noisecap-web \
+              --resource-group rg-market-insight \
+              --name market-insight-web \
               --src-path ${{ github.workspace }}/app.zip \
               --type zip

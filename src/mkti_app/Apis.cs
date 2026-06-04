@@ -9,6 +9,7 @@ public static class Apis
     private const string MockRssArticlesFileName = "articles-june.json";
     private const string MockRssFallbackFileName = "articles.json";
     private const int KnowledgeTopArticleCount = 3;
+    private const int InsightPreviewMaxLength = 500;
 
     public static void MapAllEndpoints(
         this WebApplication app,
@@ -76,15 +77,18 @@ public static class Apis
             var researchResult = await marketResearchAgent.RunAsync(
                 "Research the current copper market sentiment based on latest news and Bing search results");
 
-            await insightGenerationAgent.RunAsync("Generate today's copper market insight report and store it in markdown.");
+            await insightGenerationAgent.RunAsync("Generate a copper market insight report from the latest analyzed articles and store it in markdown.");
             var latestInsight = await ReadLatestInsightAsync(blobStorageService);
-            var insightPreview = latestInsight.Content.Length > 500 ? latestInsight.Content[..500] : latestInsight.Content;
+            var insightPreview = latestInsight.Content.Length > InsightPreviewMaxLength
+                ? latestInsight.Content[..InsightPreviewMaxLength]
+                : latestInsight.Content;
 
             return Results.Json(new
             {
                 success = true,
                 sourceFile = Path.GetFileName(sourcePath),
                 configuredTopCount = KnowledgeTopArticleCount,
+                selectionMode = "file-order-first-n",
                 articlesProcessed = selected.Count,
                 ingested,
                 analysis = new
@@ -198,7 +202,9 @@ public static class Apis
         {
             await insightGenerationAgent.RunAsync("Generate today's copper market insight report and store it in markdown.");
             var latest = await ReadLatestInsightAsync(blobStorageService);
-            var preview = latest.Content.Length > 500 ? latest.Content[..500] : latest.Content;
+            var preview = latest.Content.Length > InsightPreviewMaxLength
+                ? latest.Content[..InsightPreviewMaxLength]
+                : latest.Content;
             return Results.Json(new
             {
                 success = true,

@@ -1,4 +1,5 @@
 const tabs = [
+  { key: 'knowledge', title: 'Knowledge' },
   { key: 'ingest', title: 'News Ingestion' },
   { key: 'analyze', title: 'News Analysis' },
   { key: 'research', title: 'Market Research' },
@@ -274,12 +275,38 @@ function renderIngestTab() {
 }
 
 async function renderTab(key) {
+  if (key === 'knowledge') return renderKnowledgeTab();
   if (key === 'ingest') return renderIngestTab();
   if (key === 'analyze') return renderAnalyzeTab();
   if (key === 'research') return renderResearchTab();
   if (key === 'generate') return renderGenerateTab();
   if (key === 'subscription') return renderSubscriptionTab();
   if (key === 'delivery') return renderDeliveryTab();
+}
+
+function renderKnowledgeTab() {
+  contentEl.innerHTML = `
+    <h2>Knowledge</h2>
+    <p>Run the centralized pipeline on top articles: ingestion, analysis, market research, and insight generation.</p>
+    <button class="action" id="knowledge-run-btn">Run Knowledge Pipeline</button>
+    <pre id="result">Ready</pre>`;
+
+  document.getElementById('knowledge-run-btn').onclick = async () => {
+    const pre = document.getElementById('result');
+    const btn = document.getElementById('knowledge-run-btn');
+    btn.disabled = true;
+    pre.textContent = 'Running centralized pipeline... this may take a moment.';
+    try {
+      const response = await fetch('/api/knowledge/run');
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      const json = await response.json();
+      pre.textContent = JSON.stringify(json, null, 2);
+    } catch (e) {
+      pre.textContent = `Error: ${e.message}`;
+    } finally {
+      btn.disabled = false;
+    }
+  };
 }
 
 function renderGenerateTab() {
@@ -461,4 +488,4 @@ for (const tab of tabs) {
   tabsEl.appendChild(btn);
 }
 
-setTab('ingest');
+setTab('knowledge');

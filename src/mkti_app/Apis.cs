@@ -5,6 +5,11 @@ namespace mkti_app;
 
 public static class Apis
 {
+    private const string KnowledgeArticlesFileName = "articles.json";
+    private const string MockRssArticlesFileName = "articles-june.json";
+    private const string MockRssFallbackFileName = "articles.json";
+    private const int KnowledgeTopArticleCount = 3;
+
     public static void MapAllEndpoints(
         this WebApplication app,
         NewsIngestionAgent newsIngestionAgent,
@@ -36,6 +41,66 @@ public static class Apis
         {
             var filenames = await blobStorageService.ListBlobNamesAsync("news-store");
             return Results.Json(new { success = true, filenames });
+        });
+
+        app.MapGet("/api/knowledge/run", async (IWebHostEnvironment env) =>
+        {
+            var (sourcePath, allArticles) = await LoadMockArticlesAsync(env, KnowledgeArticlesFileName);
+            if (string.IsNullOrWhiteSpace(sourcePath))
+                return Results.NotFound($"{KnowledgeArticlesFileName} not found");
+
+            var selected = allArticles.Take(KnowledgeTopArticleCount).ToList();
+            if (selected.Count == 0)
+                return Results.Json(new { success = false, message = $"No articles found in {Path.GetFileName(sourcePath)}." });
+
+            var ingested = new List<object>();
+            foreach (var article in selected)
+            {
+                var filename = BuildKnowledgeFilename(article);
+                var htmlContent = article.HtmlContent ?? string.Empty;
+                await blobStorageService.WriteTextAsync("news-store", filename, htmlContent, "text/html");
+                await fabricLakehouseService.WriteFileAsync($"news-store/{filename}", htmlContent);
+                ingested.Add(new { articleId = article.Id, title = article.Title, filename });
+            }
+
+            var analysisBefore = new HashSet<string>(
+                await blobStorageService.ListBlobNamesAsync("news-analysis"),
+                StringComparer.OrdinalIgnoreCase);
+
+            var analysisResult = await newsAnalysisAgent.RunAsync(
+                "Analyze all unprocessed news articles and extract structured content.");
+
+            var analysisAfter = await blobStorageService.ListBlobNamesAsync("news-analysis");
+            var newlyAnalyzed = analysisAfter.Where(n => !analysisBefore.Contains(n)).ToArray();
+
+            var researchResult = await marketResearchAgent.RunAsync(
+                "Research the current copper market sentiment based on latest news and Bing search results");
+
+            await insightGenerationAgent.RunAsync("Generate today's copper market insight report and store it in markdown.");
+            var latestInsight = await ReadLatestInsightAsync(blobStorageService);
+            var insightPreview = latestInsight.Content.Length > 500 ? latestInsight.Content[..500] : latestInsight.Content;
+
+            return Results.Json(new
+            {
+                success = true,
+                sourceFile = Path.GetFileName(sourcePath),
+                configuredTopCount = KnowledgeTopArticleCount,
+                articlesProcessed = selected.Count,
+                ingested,
+                analysis = new
+                {
+                    articlesAnalyzed = newlyAnalyzed.Length,
+                    filenames = newlyAnalyzed,
+                    result = analysisResult
+                },
+                research = new { result = researchResult },
+                insight = new
+                {
+                    date = latestInsight.Date,
+                    filename = latestInsight.Filename,
+                    preview = insightPreview
+                }
+            });
         });
 
         app.MapGet("/api/news/analyze", async () =>
@@ -176,25 +241,13 @@ public static class Apis
 
         app.MapGet("/api/mock/rss", async (HttpContext context, IWebHostEnvironment env) =>
         {
-            var jsonPath = Path.Combine(env.WebRootPath, "articles.json");
-            if (!File.Exists(jsonPath))
-                return Results.NotFound("articles.json not found");
+            var (jsonPath, articles) = await LoadMockArticlesAsync(env, MockRssArticlesFileName, MockRssFallbackFileName);
+            if (string.IsNullOrWhiteSpace(jsonPath))
+                return Results.NotFound($"{MockRssArticlesFileName} not found");
 
             var baseUrl = $"{context.Request.Scheme}://{context.Request.Host}";
-            var json = await File.ReadAllTextAsync(jsonPath);
 
-            List<MockArticle>? articles;
-            try
-            {
-                articles = System.Text.Json.JsonSerializer.Deserialize<List<MockArticle>>(
-                    json, new System.Text.Json.JsonSerializerOptions { PropertyNameCaseInsensitive = true });
-            }
-            catch (System.Text.Json.JsonException)
-            {
-                articles = null;
-            }
-
-            if (articles is null || articles.Count == 0)
+            if (articles.Count == 0)
                 return Results.Content("<rss version=\"2.0\"><channel><title>Copper Market News</title></channel></rss>", "application/rss+xml");
 
             var itemsXml = string.Join("\n", articles.Select(a =>
@@ -225,21 +278,9 @@ public static class Apis
 
         app.MapGet("/api/mock/article/{id}", async (string id, IWebHostEnvironment env) =>
         {
-            var jsonPath = Path.Combine(env.WebRootPath, "articles.json");
-            if (!File.Exists(jsonPath))
-                return Results.NotFound("articles.json not found");
-
-            var json = await File.ReadAllTextAsync(jsonPath);
-            List<MockArticle>? articles;
-            try
-            {
-                articles = System.Text.Json.JsonSerializer.Deserialize<List<MockArticle>>(
-                    json, new System.Text.Json.JsonSerializerOptions { PropertyNameCaseInsensitive = true });
-            }
-            catch (System.Text.Json.JsonException)
-            {
-                articles = null;
-            }
+            var (jsonPath, articles) = await LoadMockArticlesAsync(env, MockRssArticlesFileName, MockRssFallbackFileName);
+            if (string.IsNullOrWhiteSpace(jsonPath))
+                return Results.NotFound($"{MockRssArticlesFileName} not found");
 
             var article = articles?.FirstOrDefault(a => a.Id == id);
             if (article is null)
@@ -360,6 +401,57 @@ public static class Apis
             return null;
 
         return text.Substring(start, end - start + 1);
+    }
+
+    private static async Task<(string? Path, List<MockArticle> Articles)> LoadMockArticlesAsync(
+        IWebHostEnvironment env,
+        string primaryFileName,
+        string? fallbackFileName = null)
+    {
+        string? resolvedPath = null;
+        var primaryPath = Path.Combine(env.WebRootPath, primaryFileName);
+        if (File.Exists(primaryPath))
+            resolvedPath = primaryPath;
+        else if (!string.IsNullOrWhiteSpace(fallbackFileName))
+        {
+            var fallbackPath = Path.Combine(env.WebRootPath, fallbackFileName);
+            if (File.Exists(fallbackPath))
+                resolvedPath = fallbackPath;
+        }
+
+        if (string.IsNullOrWhiteSpace(resolvedPath))
+            return (null, []);
+
+        var json = await File.ReadAllTextAsync(resolvedPath);
+        try
+        {
+            var articles = System.Text.Json.JsonSerializer.Deserialize<List<MockArticle>>(
+                json,
+                new System.Text.Json.JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+            return (resolvedPath, articles ?? []);
+        }
+        catch (System.Text.Json.JsonException)
+        {
+            return (resolvedPath, []);
+        }
+    }
+
+    private static string BuildKnowledgeFilename(MockArticle article)
+    {
+        var id = string.IsNullOrWhiteSpace(article.Id) ? Guid.NewGuid().ToString("N")[..8] : article.Id.Trim();
+        var title = string.IsNullOrWhiteSpace(article.Title) ? "article" : article.Title;
+        var slug = new string(title
+            .ToLowerInvariant()
+            .Select(c => char.IsLetterOrDigit(c) ? c : '-')
+            .ToArray());
+        while (slug.Contains("--", StringComparison.Ordinal))
+            slug = slug.Replace("--", "-", StringComparison.Ordinal);
+        slug = slug.Trim('-');
+        if (slug.Length > 60)
+            slug = slug[..60].Trim('-');
+        if (string.IsNullOrWhiteSpace(slug))
+            slug = "article";
+        return $"{id}-{slug}.html";
     }
 }
 

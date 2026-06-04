@@ -3,27 +3,29 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Market Insight Agent</title>
+  <title>News Analysis - Market Insight Agent</title>
   <link rel="stylesheet" href="/style.css" />
 </head>
 <body>
   <h1>Market Insight Agent</h1>
   <nav class="tabs">
-    <a href="/index.html" class="active">Knowledge</a>
+    <a href="/index.html">Knowledge</a>
     <a href="/ingest.html">News Ingestion</a>
-    <a href="/analyze.html">News Analysis</a>
+    <a href="/analyze.html" class="active">News Analysis</a>
     <a href="/research.html">Market Research</a>
     <a href="/generate.html">Insight Generation</a>
     <a href="/subscription.html">Subscription</a>
     <a href="/delivery.html">Insight Delivery</a>
   </nav>
   <section id="content" class="panel">
-    <h2>Knowledge</h2>
-    <p>Run the centralized pipeline on top articles: ingestion, analysis, market research, and insight generation.</p>
-    <button class="action" id="knowledge-run-btn">Run Knowledge Pipeline</button>
+    <h2>News Analysis</h2>
+    <p>Parse unprocessed news articles with Document Intelligence into structured JSON.</p>
+    <button class="action" id="analyze-btn">Analyze Articles</button>
     <pre id="result">Ready</pre>
+    <h3>Analyzed Articles</h3>
+    <div id="analysis-table"></div>
   </section>
   <script src="/common.js"></script>
-  <script src="/knowledge.js"></script>
+  <script src="/analyze.js"></script>
 </body>
 </html>

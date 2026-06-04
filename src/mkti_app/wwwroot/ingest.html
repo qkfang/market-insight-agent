@@ -3,14 +3,14 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Market Insight Agent</title>
+  <title>News Ingestion - Market Insight Agent</title>
   <link rel="stylesheet" href="/style.css" />
 </head>
 <body>
   <h1>Market Insight Agent</h1>
   <nav class="tabs">
-    <a href="/index.html" class="active">Knowledge</a>
-    <a href="/ingest.html">News Ingestion</a>
+    <a href="/index.html">Knowledge</a>
+    <a href="/ingest.html" class="active">News Ingestion</a>
     <a href="/analyze.html">News Analysis</a>
     <a href="/research.html">Market Research</a>
     <a href="/generate.html">Insight Generation</a>
@@ -18,12 +18,17 @@
     <a href="/delivery.html">Insight Delivery</a>
   </nav>
   <section id="content" class="panel">
-    <h2>Knowledge</h2>
-    <p>Run the centralized pipeline on top articles: ingestion, analysis, market research, and insight generation.</p>
-    <button class="action" id="knowledge-run-btn">Run Knowledge Pipeline</button>
+    <h2>News Ingestion</h2>
+    <p>Download the latest copper market news from RSS feeds and store articles in Fabric Datalake and Azure Blob Storage.</p>
+    <button class="action" id="ingest-btn">Ingest Now</button>
+    <span id="ingest-spinner" class="spinner" hidden></span>
+    <div id="ingest-meta"></div>
+    <div id="ingest-summary"></div>
+    <h3>Stored Articles</h3>
+    <ul id="ingest-files"><li>No articles loaded yet.</li></ul>
     <pre id="result">Ready</pre>
   </section>
   <script src="/common.js"></script>
-  <script src="/knowledge.js"></script>
+  <script src="/ingest.js"></script>
 </body>
 </html>

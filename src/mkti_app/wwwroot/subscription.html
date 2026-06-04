@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Subscription - Market Insight Agent</title>
+  <link rel="stylesheet" href="/style.css" />
+</head>
+<body>
+  <h1>Market Insight Agent</h1>
+  <nav class="tabs">
+    <a href="/index.html">Knowledge</a>
+    <a href="/ingest.html">News Ingestion</a>
+    <a href="/analyze.html">News Analysis</a>
+    <a href="/research.html">Market Research</a>
+    <a href="/generate.html">Insight Generation</a>
+    <a href="/subscription.html" class="active">Subscription</a>
+    <a href="/delivery.html">Insight Delivery</a>
+  </nav>
+  <section id="content" class="panel">
+    <h2>Insight Subscription</h2>
+    <div>
+      <strong>Markets</strong>
+      <label><input type="checkbox" name="market" value="Copper"> Copper</label>
+      <label><input type="checkbox" name="market" value="Gold"> Gold</label>
+      <label><input type="checkbox" name="market" value="Silver"> Silver</label>
+      <label><input type="checkbox" name="market" value="Aluminum"> Aluminum</label>
+    </div>
+    <div>
+      <strong>Items</strong>
+      <label><input type="checkbox" name="item" value="Daily Report"> Daily Report</label>
+      <label><input type="checkbox" name="item" value="Sentiment Alert"> Sentiment Alert</label>
+      <label><input type="checkbox" name="item" value="Price Alert"> Price Alert</label>
+    </div>
+    <button class="action" id="subscription-save">Save Preferences</button>
+    <pre id="result">Ready</pre>
+  </section>
+  <script src="/common.js"></script>
+  <script src="/subscription.js"></script>
+</body>
+</html>

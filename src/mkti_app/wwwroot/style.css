@@ -41,3 +41,10 @@ table.analysis tbody tr:hover { background: #eef6ff; }
 .markdown ul, .markdown ol { padding-left: 1.5em; }
 .markdown table { border-collapse: collapse; }
 .markdown th, .markdown td { border: 1px solid #ddd; padding: 6px 10px; }
+.agent-hint { position: relative; display: inline-block; margin-left: 10px; font-size: 13px; vertical-align: middle; }
+.agent-hint a { color: #1e88e5; text-decoration: none; font-weight: normal; border-bottom: 1px dashed #1e88e5; }
+.agent-hint a:hover { color: #1565c0; }
+.agent-popup { display: none; position: absolute; z-index: 200; top: calc(100% + 6px); left: 0; min-width: 360px; max-width: 540px; background: #fff; border: 1px solid #b0c8e8; border-radius: 6px; padding: 14px 16px; box-shadow: 0 6px 20px rgba(0,0,0,0.18); font-size: 12px; line-height: 1.6; white-space: pre-wrap; color: #333; }
+.agent-popup::before { content: ''; position: absolute; top: -7px; left: 14px; border-width: 0 6px 7px; border-style: solid; border-color: transparent transparent #b0c8e8; }
+.agent-popup::after { content: ''; position: absolute; top: -6px; left: 15px; border-width: 0 5px 6px; border-style: solid; border-color: transparent transparent #fff; }
+.agent-hint:hover .agent-popup { display: block; }

@@ -87,12 +87,19 @@ public sealed class MarketInsightMcpTools
 
     [McpServerTool(Name = "store_news_article"), Description("Store a news article to the Azure Blob 'news-store' container and the Fabric Lakehouse 'news-store' folder. Returns the storage path.")]
     public async Task<string> StoreNewsArticle(
-        [Description("Target filename, e.g. mining-com-2026-01-01.html")] string filename,
+        [Description("Short article description used as filename suffix, e.g. 'copper-prices-surge'. No extension needed.")] string description,
         [Description("Article content (html or text)")] string content,
         [Description("Content type, e.g. text/html or application/pdf")] string contentType)
     {
-        if (string.IsNullOrWhiteSpace(filename))
-            return "Error: filename is required.";
+        if (string.IsNullOrWhiteSpace(description))
+            return "Error: description is required.";
+
+        var ext = (!string.IsNullOrWhiteSpace(contentType) && contentType.Contains("pdf")) ? ".pdf" : ".html";
+        var safeDesc = string.Concat(description.ToLowerInvariant()
+            .Split(Path.GetInvalidFileNameChars(), StringSplitOptions.RemoveEmptyEntries))
+            .Replace(' ', '-');
+        var timestamp = DateTimeOffset.UtcNow.ToString("yyyyMMddHHmmss");
+        var filename = $"{timestamp}_{safeDesc}{ext}";
 
         var safeContent = content ?? string.Empty;
         var resolvedContentType = string.IsNullOrWhiteSpace(contentType) ? "text/html" : contentType;

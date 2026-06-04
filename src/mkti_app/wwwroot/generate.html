@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Insight Generation - Market Insight Agent</title>
+  <link rel="stylesheet" href="/style.css" />
+</head>
+<body>
+  <h1>Market Insight Agent</h1>
+  <nav class="tabs">
+    <a href="/index.html">Knowledge</a>
+    <a href="/ingest.html">News Ingestion</a>
+    <a href="/analyze.html">News Analysis</a>
+    <a href="/research.html">Market Research</a>
+    <a href="/generate.html" class="active">Insight Generation</a>
+    <a href="/subscription.html">Subscription</a>
+    <a href="/delivery.html">Insight Delivery</a>
+  </nav>
+  <section id="content" class="panel">
+    <h2>Insight Generation</h2>
+    <p>Generate today's copper market insight report. This may take 30-60 seconds.</p>
+    <button class="action" id="generate-btn">Generate Today's Insight</button>
+    <span id="generate-spinner" class="spinner" hidden></span>
+    <div id="generate-summary"></div>
+    <h3>Preview</h3>
+    <pre id="generate-preview">No report generated yet.</pre>
+    <div id="generate-link"></div>
+  </section>
+  <script src="/common.js"></script>
+  <script src="/generate.js"></script>
+</body>
+</html>

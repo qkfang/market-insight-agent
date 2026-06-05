@@ -10,6 +10,7 @@ public sealed class NewsAnalysisAgent : BaseAgent
         "Use the list_unprocessed_news tool to find articles that have not been analyzed yet, then for each one call " +
         "parse_article_with_doc_intelligence and store the result with store_news_analysis. " +
         "Store the result as JSON with title, date, source, markdownContent fields. Focus on copper market relevance. " +
+        "When calling store_news_analysis, provide a concise kebab-case description of the article as the 'description' parameter (e.g. 'copper-prices-surge-q2'). The tool will automatically prepend a yyyyMMddHHmmss timestamp prefix to form the final filename. " +
         "Skip articles that have already been analyzed.";
 
     public NewsAnalysisAgent(AIProjectClient aiProjectClient, string deploymentName, IList<ResponseTool>? tools = null, ILogger<NewsAnalysisAgent>? logger = null)

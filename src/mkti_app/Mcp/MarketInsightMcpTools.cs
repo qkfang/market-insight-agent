@@ -196,17 +196,21 @@ public sealed class MarketInsightMcpTools
         return JsonSerializer.Serialize(parsed, JsonOptions);
     }
 
-    [McpServerTool(Name = "store_news_analysis"), Description("Store the structured news analysis JSON to the news-analysis blob container and the Fabric news-analysis folder. The blob name is {filename}.json.")]
+    [McpServerTool(Name = "store_news_analysis"), Description("Store the structured news analysis JSON to the news-analysis blob container and the Fabric news-analysis folder. The blob name is {yyyyMMddHHmmss}_{description}.json.")]
     public async Task<string> StoreNewsAnalysis(
-        [Description("Original article filename, e.g. source/news-2026-01-01.html")] string filename,
+        [Description("Short article description used as filename suffix, e.g. 'copper-prices-surge'. No extension needed.")] string description,
         [Description("Analysis content as a JSON string with title, date, source and markdownContent fields")] string analysisJson)
     {
-        if (string.IsNullOrWhiteSpace(filename))
-            return "Error: filename is required.";
+        if (string.IsNullOrWhiteSpace(description))
+            return "Error: description is required.";
         if (string.IsNullOrWhiteSpace(analysisJson))
             return "Error: analysisJson is required.";
 
-        var blobName = $"{filename}.json";
+        var safeDesc = string.Concat(description.ToLowerInvariant()
+            .Split(Path.GetInvalidFileNameChars(), StringSplitOptions.RemoveEmptyEntries))
+            .Replace(' ', '-');
+        var timestamp = DateTimeOffset.UtcNow.ToString("yyyyMMddHHmmss");
+        var blobName = $"{timestamp}_{safeDesc}.json";
         await _blobStorageService.WriteTextAsync(NewsAnalysisContainer, blobName, analysisJson);
         var fabricStored = await _fabricLakehouseService.WriteFileAsync($"news-analysis/{blobName}", analysisJson);
 

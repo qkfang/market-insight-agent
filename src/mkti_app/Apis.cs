@@ -44,66 +44,43 @@ public static class Apis
             return Results.Json(new { success = true, filenames });
         });
 
-        app.MapGet("/api/knowledge/run", async (IWebHostEnvironment env) =>
+        app.MapGet("/api/knowledge/run", async (HttpContext httpContext, IHttpClientFactory httpClientFactory) =>
         {
-            var (sourcePath, allArticles) = await LoadMockArticlesAsync(env, KnowledgeArticlesFileName);
-            if (string.IsNullOrWhiteSpace(sourcePath))
-                return Results.NotFound($"{KnowledgeArticlesFileName} not found");
+            var baseUrl = $"{httpContext.Request.Scheme}://{httpContext.Request.Host}";
+            var client = httpClientFactory.CreateClient();
+            client.Timeout = TimeSpan.FromMinutes(10);
 
-            var selected = allArticles.Take(KnowledgeTopArticleCount).ToList();
-            if (selected.Count == 0)
-                return Results.Json(new { success = false, message = $"No articles found in {Path.GetFileName(sourcePath)}." });
+            // Step 1: Ingest (same as Ingest tab)
+            var ingestResponse = await client.GetAsync($"{baseUrl}/api/news/ingest");
+            ingestResponse.EnsureSuccessStatusCode();
+            var ingestJson = await ingestResponse.Content.ReadAsStringAsync();
+            var ingestResult = System.Text.Json.JsonSerializer.Deserialize<System.Text.Json.JsonElement>(ingestJson);
 
-            var ingested = new List<object>();
-            foreach (var article in selected)
-            {
-                var filename = BuildKnowledgeFilename(article);
-                var htmlContent = article.HtmlContent ?? string.Empty;
-                await blobStorageService.WriteTextAsync("news-store", filename, htmlContent, "text/html");
-                await fabricLakehouseService.WriteFileAsync($"news-store/{filename}", htmlContent);
-                ingested.Add(new { articleId = article.Id, title = article.Title, filename });
-            }
+            // Step 2: Analyze (same as Analyze tab)
+            var analyzeResponse = await client.GetAsync($"{baseUrl}/api/news/analyze");
+            analyzeResponse.EnsureSuccessStatusCode();
+            var analyzeJson = await analyzeResponse.Content.ReadAsStringAsync();
+            var analyzeResult = System.Text.Json.JsonSerializer.Deserialize<System.Text.Json.JsonElement>(analyzeJson);
 
-            var analysisBefore = new HashSet<string>(
-                await blobStorageService.ListBlobNamesAsync("news-analysis"),
-                StringComparer.OrdinalIgnoreCase);
+            // Step 3: Research (same as Research tab)
+            var researchResponse = await client.GetAsync($"{baseUrl}/api/market/research");
+            researchResponse.EnsureSuccessStatusCode();
+            var researchJson = await researchResponse.Content.ReadAsStringAsync();
+            var researchResult = System.Text.Json.JsonSerializer.Deserialize<System.Text.Json.JsonElement>(researchJson);
 
-            var analysisResult = await newsAnalysisAgent.RunAsync(
-                "Analyze all unprocessed news articles and extract structured content.");
-
-            var analysisAfter = await blobStorageService.ListBlobNamesAsync("news-analysis");
-            var newlyAnalyzed = analysisAfter.Where(n => !analysisBefore.Contains(n)).ToArray();
-
-            var researchResult = await marketResearchAgent.RunAsync(
-                "Research the current copper market sentiment based on latest news and Bing search results");
-
-            await insightGenerationAgent.RunAsync("Generate a copper market insight report from the latest analyzed articles and store it in markdown.");
-            var latestInsight = await ReadLatestInsightAsync(blobStorageService);
-            var insightPreview = latestInsight.Content.Length > InsightPreviewMaxLength
-                ? latestInsight.Content[..InsightPreviewMaxLength]
-                : latestInsight.Content;
+            // Step 4: Generate insight (same as Generate tab)
+            var generateResponse = await client.GetAsync($"{baseUrl}/api/insight/generate");
+            generateResponse.EnsureSuccessStatusCode();
+            var generateJson = await generateResponse.Content.ReadAsStringAsync();
+            var generateResult = System.Text.Json.JsonSerializer.Deserialize<System.Text.Json.JsonElement>(generateJson);
 
             return Results.Json(new
             {
                 success = true,
-                sourceFile = Path.GetFileName(sourcePath),
-                configuredTopCount = KnowledgeTopArticleCount,
-                selectionMode = "file-order-first-n",
-                articlesProcessed = selected.Count,
-                ingested,
-                analysis = new
-                {
-                    articlesAnalyzed = newlyAnalyzed.Length,
-                    filenames = newlyAnalyzed,
-                    result = analysisResult
-                },
-                research = new { result = researchResult },
-                insight = new
-                {
-                    date = latestInsight.Date,
-                    filename = latestInsight.Filename,
-                    preview = insightPreview
-                }
+                ingest = ingestResult,
+                analysis = analyzeResult,
+                research = researchResult,
+                insight = generateResult
             });
         });
 

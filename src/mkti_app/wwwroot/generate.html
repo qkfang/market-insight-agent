@@ -9,7 +9,8 @@
 <body>
   <h1>Market Insight Agent</h1>
   <nav class="tabs">
-    <a href="/index.html">Knowledge</a>
+    <a href="/index.html">Overview</a>
+    <a href="/knowledge.html">Knowledge</a>
     <a href="/ingest.html">News Ingestion</a>
     <a href="/analyze.html">News Analysis</a>
     <a href="/research.html">Market Research</a>
@@ -18,7 +19,13 @@
     <a href="/delivery.html">Insight Delivery</a>
   </nav>
   <section id="content" class="panel">
-    <h2>Insight Generation</h2>
+    <h2>Insight Generation <span class="agent-hint"><a href="#">Agent Instructions</a><div class="agent-popup">You are a market insight report writer. First call get_latest_research and read_news_analysis (or list_news_analysis) to gather the copper market sentiment research and latest news analysis.
+
+Using that information, produce a professional daily market insight report in markdown format.
+
+Include these sections: Executive Summary, Market Sentiment, Key Price Drivers, Risk Factors, Outlook, and Sources.
+
+Store the result with today's date by calling the store_market_insight MCP tool, passing today's date (yyyy-MM-dd) and the markdown content.</div></span></h2>
     <p>Generate today's copper market insight report. This may take 30-60 seconds.</p>
     <button class="action" id="generate-btn">Generate Today's Insight</button>
     <span id="generate-spinner" class="spinner" hidden></span>

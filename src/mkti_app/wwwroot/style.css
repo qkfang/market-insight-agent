@@ -41,6 +41,11 @@ table.analysis tbody tr:hover { background: #eef6ff; }
 .markdown ul, .markdown ol { padding-left: 1.5em; }
 .markdown table { border-collapse: collapse; }
 .markdown th, .markdown td { border: 1px solid #ddd; padding: 6px 10px; }
+.steps { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 16px; margin-top: 16px; }
+.step-card { display: flex; gap: 14px; border: 1px solid #ddd; border-radius: 6px; padding: 16px; background: #fafafa; }
+.step-num { flex-shrink: 0; width: 32px; height: 32px; border-radius: 50%; background: #1e88e5; color: #fff; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 15px; }
+.step-body h3 { margin: 0 0 6px; font-size: 15px; }
+.step-body p { margin: 0 0 10px; font-size: 13px; color: #555; line-height: 1.4; }
 .agent-hint { position: relative; display: inline-block; margin-left: 10px; font-size: 13px; vertical-align: middle; }
 .agent-hint a { color: #1e88e5; text-decoration: none; font-weight: normal; border-bottom: 1px dashed #1e88e5; }
 .agent-hint a:hover { color: #1565c0; }

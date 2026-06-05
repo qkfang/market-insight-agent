@@ -9,7 +9,8 @@
 <body>
   <h1>Market Insight Agent</h1>
   <nav class="tabs">
-    <a href="/index.html">Knowledge</a>
+    <a href="/index.html">Overview</a>
+    <a href="/knowledge.html">Knowledge</a>
     <a href="/ingest.html">News Ingestion</a>
     <a href="/analyze.html" class="active">News Analysis</a>
     <a href="/research.html">Market Research</a>
@@ -18,7 +19,11 @@
     <a href="/delivery.html">Insight Delivery</a>
   </nav>
   <section id="content" class="panel">
-    <h2>News Analysis</h2>
+    <h2>News Analysis <span class="agent-hint"><a href="#">Agent Instructions</a><div class="agent-popup">You are a news analysis agent. For each raw news article, use Document Intelligence to extract the content as markdown.
+
+Use the list_unprocessed_news tool to find articles that have not been analyzed yet, then for each one call parse_article_with_doc_intelligence and store the result with store_news_analysis.
+
+Store the result as JSON with title, date, source, markdownContent fields. Focus on copper market relevance. Skip articles that have already been analyzed.</div></span></h2>
     <p>Parse unprocessed news articles with Document Intelligence into structured JSON.</p>
     <button class="action" id="analyze-btn">Analyze Articles</button>
     <pre id="result">Ready</pre>

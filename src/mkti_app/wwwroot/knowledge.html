@@ -3,32 +3,28 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Insight Delivery - Market Insight Agent</title>
+  <title>Knowledge Pipeline - Market Insight Agent</title>
   <link rel="stylesheet" href="/style.css" />
 </head>
 <body>
   <h1>Market Insight Agent</h1>
   <nav class="tabs">
     <a href="/index.html">Overview</a>
-    <a href="/knowledge.html">Knowledge</a>
+    <a href="/knowledge.html" class="active">Knowledge</a>
     <a href="/ingest.html">News Ingestion</a>
     <a href="/analyze.html">News Analysis</a>
     <a href="/research.html">Market Research</a>
     <a href="/generate.html">Insight Generation</a>
     <a href="/subscription.html">Subscription</a>
-    <a href="/delivery.html" class="active">Insight Delivery</a>
+    <a href="/delivery.html">Insight Delivery</a>
   </nav>
   <section id="content" class="panel">
-    <h2>Insight Delivery</h2>
-    <div id="delivery-controls">
-      <label>Previous Reports:
-        <select id="delivery-select"><option value="">Latest</option></select>
-      </label>
-      <span id="delivery-date"></span>
-    </div>
-    <article id="delivery-content" class="markdown">Loading...</article>
+    <h2>Knowledge</h2>
+    <p>Run the centralized pipeline on top articles: ingestion, analysis, market research, and insight generation.</p>
+    <button class="action" id="knowledge-run-btn">Run Knowledge Pipeline</button>
+    <pre id="result">Ready</pre>
   </section>
   <script src="/common.js"></script>
-  <script src="/delivery.js"></script>
+  <script src="/knowledge.js"></script>
 </body>
 </html>

@@ -551,16 +551,21 @@ public sealed class MarketInsightMcpTools
         return JsonSerializer.Serialize(items, JsonOptions);
     }
 
-    [McpServerTool(Name = "bing_search_market"), Description("Search Bing for current price and market news for a given commodity market. Returns a JSON array of up to 5 results with { title, snippet, url }.")]
+    [McpServerTool(Name = "bing_search_market"), Description("Search Bing for current price and market news for a given commodity market within a date range. Returns a JSON array of up to 5 results with { title, snippet, url }.")]
     public async Task<string> BingSearchMarket(
         [Description("Market name, e.g. 'copper', 'gold', 'silver', 'oil'.")] string market,
-        [Description("Optional week range hint, e.g. '2026-06-02 to 2026-06-08'.")] string? weekRange = null)
+        [Description("Inclusive start date of the week in yyyy-MM-dd format, e.g. '2026-06-02'.")] string? weekStart = null,
+        [Description("Inclusive end date of the week in yyyy-MM-dd format, e.g. '2026-06-08'.")] string? weekEnd = null)
     {
         if (string.IsNullOrWhiteSpace(market))
             return "Error: market is required.";
 
         if (!_bingSearchService.IsConfigured)
             return "Error: Bing Search is not configured (set BING_SEARCH_API_KEY and BING_SEARCH_ENDPOINT).";
+
+        var weekRange = (!string.IsNullOrWhiteSpace(weekStart) && !string.IsNullOrWhiteSpace(weekEnd))
+            ? $"{weekStart} to {weekEnd}"
+            : null;
 
         var query = string.IsNullOrWhiteSpace(weekRange)
             ? $"{market} price today market sentiment this week"
@@ -574,13 +579,19 @@ public sealed class MarketInsightMcpTools
         return JsonSerializer.Serialize(items, JsonOptions);
     }
 
-    [McpServerTool(Name = "read_news_analysis_by_market"), Description("Read the N most recent news-analysis documents that mention the specified market keyword. Returns a JSON array of { filename, title, date, source, markdownContent }.")]
+    [McpServerTool(Name = "read_news_analysis_by_market"), Description("Read the N most recent news-analysis documents that mention the specified market keyword, optionally filtered to a date range. Returns a JSON array of { filename, title, date, source, markdownContent }.")]
     public async Task<string> ReadNewsAnalysisByMarket(
         [Description("Market keyword to filter by, e.g. 'copper', 'gold', 'silver', 'oil'.")] string market,
+        [Description("Optional inclusive start date filter in yyyy-MM-dd format, e.g. '2026-06-02'. Only articles on or after this date are returned.")] string? weekStart = null,
+        [Description("Optional inclusive end date filter in yyyy-MM-dd format, e.g. '2026-06-08'. Only articles on or before this date are returned.")] string? weekEnd = null,
         [Description("Maximum number of matching documents to return. Defaults to 10.")] int count = 10)
     {
         if (string.IsNullOrWhiteSpace(market))
             return "Error: market is required.";
+
+        DateOnly? fromDate = null, toDate = null;
+        if (!string.IsNullOrWhiteSpace(weekStart) && DateOnly.TryParse(weekStart, out var fd)) fromDate = fd;
+        if (!string.IsNullOrWhiteSpace(weekEnd) && DateOnly.TryParse(weekEnd, out var td)) toDate = td;
 
         var names = await _blobStorageService.ListRecentBlobNamesAsync(NewsAnalysisContainer, 100);
         var items = new List<object>();
@@ -609,6 +620,16 @@ public sealed class MarketInsightMcpTools
             catch (JsonException)
             {
                 markdownContent = content;
+            }
+
+            // Filter by date range if specified.
+            if ((fromDate.HasValue || toDate.HasValue) && !string.IsNullOrWhiteSpace(date))
+            {
+                if (DateOnly.TryParse(date[..Math.Min(10, date.Length)], out var articleDate))
+                {
+                    if (fromDate.HasValue && articleDate < fromDate.Value) continue;
+                    if (toDate.HasValue && articleDate > toDate.Value) continue;
+                }
             }
 
             // Include article only if it mentions the market keyword.
@@ -721,15 +742,21 @@ public sealed class MarketInsightMcpTools
         }, JsonOptions);
     }
 
-    [McpServerTool(Name = "list_market_research_history"), Description("List all market-research JSON files from the market-research blob container whose week start date is on or before the specified cutoff date, ordered from oldest to newest. Returns a JSON array of { filename, weekStart, weekEnd, market, sentiment, confidence, keyDrivers, summary, bingNews, newsAnalysisArticles }. Use this to build a historical timeline of market view changes.")]
+    [McpServerTool(Name = "list_market_research_history"), Description("List market-research JSON files from the market-research blob container filtered by an optional date range, ordered from oldest to newest. Returns a JSON array of { filename, weekStart, weekEnd, market, sentiment, confidence, keyDrivers, summary, bingNews, newsAnalysisArticles }. Use this to build a historical timeline of market view changes.")]
     public async Task<string> ListMarketResearchHistory(
         [Description("Market name to filter by, e.g. 'copper'. Leave empty to include all markets.")] string? market = null,
-        [Description("Cutoff date (inclusive) in yyyy-MM-dd format. Only files with a weekStart on or before this date are included. Defaults to today's UTC date when omitted.")] string? upToDate = null)
+        [Description("Cutoff date (inclusive) in yyyy-MM-dd format. Only files with a weekStart on or before this date are included. Defaults to today's UTC date when omitted.")] string? upToDate = null,
+        [Description("Start date (inclusive) in yyyy-MM-dd format. Only files with a weekStart on or after this date are included. Use to limit the lookback window, e.g. set to 6 months ago.")] string? fromDate = null)
     {
         var cutoff = string.IsNullOrWhiteSpace(upToDate)
             ? DateTime.UtcNow.Date
             : DateTime.TryParseExact(upToDate.Trim(), "yyyy-MM-dd", CultureInfo.InvariantCulture,
                 DateTimeStyles.None, out var d) ? d.Date : DateTime.UtcNow.Date;
+
+        var from = string.IsNullOrWhiteSpace(fromDate)
+            ? (DateTime?)null
+            : DateTime.TryParseExact(fromDate.Trim(), "yyyy-MM-dd", CultureInfo.InvariantCulture,
+                DateTimeStyles.None, out var fd) ? fd.Date : (DateTime?)null;
 
         var names = await _blobStorageService.ListBlobNamesAsync(MarketResearchContainer);
         var items = new List<object>();
@@ -746,6 +773,9 @@ public sealed class MarketInsightMcpTools
                 continue;
 
             if (weekStartDate.Date > cutoff)
+                continue;
+
+            if (from.HasValue && weekStartDate.Date < from.Value)
                 continue;
 
             var content = await _blobStorageService.ReadTextAsync(MarketResearchContainer, name);

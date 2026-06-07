@@ -11,37 +11,54 @@ const badges = {
   neutral: { cls: 'neutral', icon: '◆', label: 'Neutral' }
 };
 
-function renderResult(data) {
-  const key = String(data.sentiment || 'neutral').toLowerCase();
+const marketIcons = { copper: '🟤', gold: '🟡', silver: '⚪', oil: '🛢️' };
+
+function getCheckedMarkets() {
+  return Array.from(document.querySelectorAll('input[name="market"]:checked')).map(cb => cb.value);
+}
+
+function renderMarketCard(m) {
+  const key = String(m.sentiment || 'neutral').toLowerCase();
   const badge = badges[key] || badges.neutral;
-  const confidencePct = Math.round((Number(data.confidence) || 0) * 100);
-  const drivers = Array.isArray(data.keyDrivers) ? data.keyDrivers : [];
+  const confidencePct = Math.round((Number(m.confidence) || 0) * 100);
+  const drivers = Array.isArray(m.keyDrivers) ? m.keyDrivers : [];
   const driversHtml = drivers.length
     ? `<ul>${drivers.map(d => `<li>${escapeHtml(d)}</li>`).join('')}</ul>`
     : '<p>No key drivers identified.</p>';
-  const timestamp = data.timestamp
-    ? `<span class="research-timestamp">Generated: ${new Date(data.timestamp).toLocaleString()}</span>`
-    : '';
-
-  resultEl.innerHTML = `
+  const icon = marketIcons[m.market] || '📊';
+  return `
     <div class="research-card">
       <div class="research-card-header">
+        <span class="research-market-name">${icon} ${escapeHtml((m.market || '').toUpperCase())}</span>
         <div class="sentiment-badge ${badge.cls}">
           <span class="sentiment-icon">${badge.icon}</span>
           <span class="sentiment-label">${badge.label}</span>
           <span class="sentiment-confidence">${confidencePct}% confidence</span>
         </div>
-        ${timestamp}
       </div>
       <div class="research-key-drivers">
         <h4>Key Drivers</h4>
         ${driversHtml}
       </div>
-      <div class="research-summary">${escapeHtml(data.summary || '')}</div>
+      <div class="research-summary">${escapeHtml(m.summary || '')}</div>
     </div>`;
 }
 
+function renderResult(data) {
+  const markets = Array.isArray(data.markets) ? data.markets : [];
+  if (markets.length === 0) {
+    resultEl.innerHTML = '<p class="research-error">No results returned.</p>';
+    return;
+  }
+  resultEl.innerHTML = `<div class="research-cards-grid">${markets.map(renderMarketCard).join('')}</div>`;
+}
+
 btn.onclick = async () => {
+  const selected = getCheckedMarkets();
+  if (selected.length === 0) {
+    resultEl.innerHTML = '<p class="research-error">Please select at least one market.</p>';
+    return;
+  }
   btn.disabled = true;
   spinner.hidden = false;
   resultEl.innerHTML = '';
@@ -51,6 +68,7 @@ btn.onclick = async () => {
     const params = new URLSearchParams();
     if (fromInput.value) params.set('from', fromInput.value);
     if (toInput.value) params.set('to', toInput.value);
+    params.set('markets', selected.join(','));
     const response = await fetch(`/api/market/research?${params}`);
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
     const json = await response.json();

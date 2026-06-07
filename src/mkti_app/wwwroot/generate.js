@@ -6,7 +6,16 @@ const summary = document.getElementById('generate-summary');
 const preview = document.getElementById('generate-preview');
 const link = document.getElementById('generate-link');
 
+function getCheckedMarkets() {
+  return Array.from(document.querySelectorAll('input[name="gen-market"]:checked')).map(cb => cb.value);
+}
+
 btn.onclick = async () => {
+  const selected = getCheckedMarkets();
+  if (selected.length === 0) {
+    summary.innerHTML = '<span class="status-badge error">Please select at least one market.</span>';
+    return;
+  }
   btn.disabled = true;
   spinner.hidden = false;
   summary.innerHTML = '';
@@ -17,6 +26,7 @@ btn.onclick = async () => {
     const params = new URLSearchParams();
     if (fromInput.value) params.set('from', fromInput.value);
     if (toInput.value) params.set('to', toInput.value);
+    params.set('markets', selected.join(','));
     const response = await fetch(`/api/insight/generate?${params}`);
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
     const json = await response.json();

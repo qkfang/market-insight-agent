@@ -44,7 +44,7 @@ Using that information, produce a professional daily market insight report in ma
 Include these sections: Executive Summary, Market Sentiment, Key Price Drivers, Risk Factors, Outlook, and Sources.
 
 Store the result with today's date by calling the store_market_insight MCP tool, passing today's date (yyyy-MM-dd) and the markdown content.</div></span></h2>
-          <p class="panel-desc">Generate today's copper market insight report. This may take 30–60 seconds.</p>
+          <p class="panel-desc">Generate a copper market insight report for the selected markets. This may take 30–60 seconds.</p>
         </div>
       </div>
       <div class="action-bar">
@@ -52,7 +52,13 @@ Store the result with today's date by calling the store_market_insight MCP tool,
         <input type="date" id="generate-from" value="2026-06-01" />
         <label for="generate-to">To:</label>
         <input type="date" id="generate-to" value="2026-06-07" />
-        <button class="action" id="generate-btn">✦ Generate Today's Insight</button>
+        <div class="market-checkboxes">
+          <label class="market-check"><input type="checkbox" name="gen-market" value="copper" checked /> 🟤 Copper</label>
+          <label class="market-check"><input type="checkbox" name="gen-market" value="gold" checked /> 🟡 Gold</label>
+          <label class="market-check"><input type="checkbox" name="gen-market" value="silver" checked /> ⚪ Silver</label>
+          <label class="market-check"><input type="checkbox" name="gen-market" value="oil" checked /> 🛢️ Oil</label>
+        </div>
+        <button class="action" id="generate-btn">✦ Generate Insight</button>
         <span id="generate-spinner" class="spinner" hidden></span>
       </div>
       <div id="generate-summary"></div>

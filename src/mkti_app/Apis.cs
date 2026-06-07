@@ -188,9 +188,15 @@ public static class Apis
             return Results.Json(new { status = "ok", content });
         });
 
-        app.MapGet("/api/market/research", async (string? from, string? to) =>
+        app.MapGet("/api/market/research", async (string? from, string? to, string? markets) =>
         {
-            var markets = new[] { "copper", "gold", "silver", "oil" };
+            var allMarkets = new[] { "copper", "gold", "silver", "oil" };
+            var selectedMarkets = string.IsNullOrWhiteSpace(markets)
+                ? allMarkets
+                : markets.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                         .Where(m => allMarkets.Contains(m, StringComparer.OrdinalIgnoreCase))
+                         .ToArray();
+            if (selectedMarkets.Length == 0) selectedMarkets = allMarkets;
 
             // Use provided from/to, or fall back to the Monday–Sunday of the current UTC week.
             var today = DateTime.UtcNow.Date;
@@ -201,7 +207,7 @@ public static class Apis
             var weekEndStr   = !string.IsNullOrWhiteSpace(to)   ? to   : weekEnd.ToString("yyyy-MM-dd");
 
             var results = new List<object>();
-            foreach (var market in markets)
+            foreach (var market in selectedMarkets)
             {
                 var message =
                     $"Research the {market} market for the week {weekStartStr} to {weekEndStr}. " +
@@ -242,12 +248,21 @@ public static class Apis
             });
         });
 
-        app.MapGet("/api/insight/generate", async (string? from, string? to) =>
+        app.MapGet("/api/insight/generate", async (string? from, string? to, string? markets) =>
         {
+            var allMarkets = new[] { "copper", "gold", "silver", "oil" };
+            var selectedMarkets = string.IsNullOrWhiteSpace(markets)
+                ? allMarkets
+                : markets.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                         .Where(m => allMarkets.Contains(m, StringComparer.OrdinalIgnoreCase))
+                         .ToArray();
+            if (selectedMarkets.Length == 0) selectedMarkets = allMarkets;
+
             var today = DateTime.UtcNow.Date;
             var fromStr = !string.IsNullOrWhiteSpace(from) ? from : today.ToString("yyyy-MM-dd");
             var toStr   = !string.IsNullOrWhiteSpace(to)   ? to   : today.ToString("yyyy-MM-dd");
-            await insightGenerationAgent.RunAsync($"Generate the copper market insight report for the date range {fromStr} to {toStr} and store it in markdown.");
+            var marketsList = string.Join(", ", selectedMarkets);
+            await insightGenerationAgent.RunAsync($"Generate a market insight report for the following markets: {marketsList}. Date range: {fromStr} to {toStr}. Only include analysis for these markets: {marketsList}. Store the result in markdown.");
             var latest = await ReadLatestInsightAsync(blobStorageService);
             var preview = latest.Content.Length > InsightPreviewMaxLength
                 ? latest.Content[..InsightPreviewMaxLength]

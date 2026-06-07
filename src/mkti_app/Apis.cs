@@ -320,7 +320,6 @@ public static class Apis
             var weekStart = weekEnd.AddDays(-41); // ~6 weeks back
             var fromStr = !string.IsNullOrWhiteSpace(from) ? from : weekStart.ToString("yyyy-MM-dd");
             var toStr   = !string.IsNullOrWhiteSpace(to)   ? to   : weekEnd.ToString("yyyy-MM-dd");
-            var todayStr = today.ToString("yyyy-MM-dd");
 
             var results = new List<object>();
             foreach (var market in selectedMarkets)
@@ -328,9 +327,9 @@ public static class Apis
                 var message =
                     $"Generate a professional market insight report for the {market} market. " +
                     $"Focus ONLY on the {market} market. " +
-                    $"Use list_market_research_history with market='{market}' to retrieve all historical weekly snapshots (look back as many weeks as available, at least 6 weeks). " +
+                    $"Use list_market_research_history with market='{market}', upToDate='{toStr}', retrieve all historical weekly snapshots (look back as many weeks as available, at least 6 weeks)." +
                     $"Date range for context: {fromStr} to {toStr}. " +
-                    $"Store the result by calling store_market_insight_for_market with market='{market}' and date='{todayStr}'.";
+                    $"Store the result by calling store_market_insight_for_market with market='{market}' and date='{toStr}'.";
 
                 logger.LogInformation("Invoking InsightGenerationAgent for market={Market}", market);
                 var insightSw = Stopwatch.StartNew();
@@ -338,8 +337,8 @@ public static class Apis
                 insightSw.Stop();
                 logger.LogInformation("InsightGenerationAgent completed for market={Market} in {ElapsedMs}ms", market, insightSw.ElapsedMilliseconds);
 
-                // Read back the stored insight for this market
-                var filename = $"{todayStr}_{market}_insight.md";
+                // Read back the stored insight for this market (filename is keyed on fromStr, not today)
+                var filename = $"{fromStr}_{market}_insight.md";
                 var content = await blobStorageService.ReadTextAsync("market-insight", filename) ?? string.Empty;
                 if (string.IsNullOrEmpty(content))
                 {
@@ -358,7 +357,7 @@ public static class Apis
                     ? content[..InsightPreviewMaxLength]
                     : content;
 
-                results.Add(new { market, date = todayStr, filename, preview });
+                results.Add(new { market, date = fromStr, filename, preview });
             }
 
             return Results.Json(new

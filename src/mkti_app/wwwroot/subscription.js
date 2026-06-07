@@ -38,13 +38,42 @@ async function showInsightForMarket(market) {
 
 // ── Subscription Report Generator ────────────────────────────────────────────
 const generateBtn  = document.getElementById('subscription-generate');
+const createPdfBtn = document.getElementById('subscription-create-pdf');
+const subRefreshBtn  = document.getElementById('sub-refresh-btn');
+const subCacheTimeEl = document.getElementById('sub-cache-time');
 const subSpinner   = document.getElementById('sub-spinner');
 const subStatus    = document.getElementById('sub-status');
-const pdfSection   = document.getElementById('sub-pdf-section');
-const pdfReports   = document.getElementById('sub-pdf-reports');
 const fromInput    = document.getElementById('sub-from');
 const toInput      = document.getElementById('sub-to');
 const audienceSelect = document.getElementById('sub-audience');
+
+async function loadSubscriptionCache() {
+  try {
+    const r = await fetch('/temp/cache-subscription.json');
+    if (!r.ok) throw new Error('no cache');
+    const json = await r.json();
+    if (json.cachedAt && subCacheTimeEl) subCacheTimeEl.textContent = `cached ${new Date(json.cachedAt).toLocaleString()}`;
+  } catch {
+    if (subCacheTimeEl) subCacheTimeEl.textContent = '';
+  }
+}
+
+async function refreshSubscriptionCache() {
+  if (subRefreshBtn) subRefreshBtn.disabled = true;
+  try {
+    const r = await fetch('/api/insight/list');
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    const now = new Date().toLocaleString();
+    if (subCacheTimeEl) subCacheTimeEl.textContent = `cached ${now}`;
+  } catch (e) {
+    if (subCacheTimeEl) subCacheTimeEl.textContent = `refresh failed`;
+  } finally {
+    if (subRefreshBtn) subRefreshBtn.disabled = false;
+  }
+}
+
+if (subRefreshBtn) subRefreshBtn.onclick = refreshSubscriptionCache;
+loadSubscriptionCache();
 
 const marketIcons = { copper: '🟤', gold: '🟡', silver: '⚪', oil: '🛢️' };
 
@@ -61,9 +90,7 @@ generateBtn.onclick = async () => {
 
   generateBtn.disabled = true;
   subSpinner.hidden = false;
-  subStatus.innerHTML = `<p style="color:var(--color-text-muted);font-size:13px;">Generating branded reports for ${escapeHtml(audience)}… this may take 30–60 seconds.</p>`;
-  pdfSection.style.display = 'none';
-  pdfReports.innerHTML = '';
+  subStatus.innerHTML = `<p style="color:var(--color-text-muted);font-size:13px;">Loading reports for ${escapeHtml(audience)}… this may take 30–60 seconds.</p>`;
 
   try {
     const response = await fetch('/api/subscription/generate', {
@@ -81,8 +108,6 @@ generateBtn.onclick = async () => {
     if (selectedMarkets.length > 0) {
       await showInsightForMarket(selectedMarkets[0]);
     }
-
-    renderPdfReports(json.reports || [], audience);
   } catch (e) {
     subStatus.innerHTML = `<p class="research-error">Error: ${escapeHtml(e.message)}</p>`;
   } finally {
@@ -91,75 +116,4 @@ generateBtn.onclick = async () => {
   }
 };
 
-function renderPdfReports(reports, audience) {
-  if (reports.length === 0) return;
-
-  pdfReports.innerHTML = '';
-  reports.forEach(r => {
-    const icon = marketIcons[r.market] || '📊';
-    const wrapper = document.createElement('div');
-    wrapper.className = 'panel';
-    wrapper.style.marginBottom = '20px';
-
-    const header = document.createElement('div');
-    header.className = 'panel-header';
-    header.innerHTML = `
-      <div>
-        <h2 class="panel-title">${icon} ${escapeHtml((r.market || '').toUpperCase())} — ${escapeHtml(audience)}</h2>
-        <p class="panel-desc">Branded intelligence report · ${escapeHtml(r.filename || '')}</p>
-      </div>
-      <div style="display:flex;gap:8px;align-items:center;">
-        ${r.reportUrl ? `<a class="action" style="padding:4px 12px;font-size:12px;" href="${escapeHtml(r.reportUrl)}" target="_blank">🔗 Open in Tab</a>` : ''}
-        ${r.pdfUrl ? `<a class="action" style="padding:4px 12px;font-size:12px;" href="${escapeHtml(r.pdfUrl)}" target="_blank" download>📄 Download PDF</a>` : ''}
-        <button class="action" style="padding:4px 12px;font-size:12px;" onclick="printFrame('frame-${escapeHtml(r.market)}')">🖨️ Print / Save PDF</button>
-      </div>`;
-
-    wrapper.appendChild(header);
-
-    if (r.htmlBase64) {
-      const html = decodeBase64Utf8(r.htmlBase64);
-      const blob = new Blob([html], { type: 'text/html; charset=utf-8' });
-      const blobUrl = URL.createObjectURL(blob);
-
-      const frame = document.createElement('iframe');
-      frame.id = `frame-${r.market}`;
-      frame.src = blobUrl;
-      frame.style.cssText = 'width:100%;height:820px;border:1px solid var(--color-border);border-radius:6px;margin-top:12px;background:#fff;';
-      frame.setAttribute('title', `${r.market} insight report for ${audience}`);
-      wrapper.appendChild(frame);
-    } else if (r.reportUrl) {
-      const frame = document.createElement('iframe');
-      frame.id = `frame-${r.market}`;
-      frame.src = r.reportUrl;
-      frame.style.cssText = 'width:100%;height:820px;border:1px solid var(--color-border);border-radius:6px;margin-top:12px;background:#fff;';
-      frame.setAttribute('title', `${r.market} insight report for ${audience}`);
-      wrapper.appendChild(frame);
-    } else {
-      const msg = document.createElement('p');
-      msg.className = 'research-error';
-      msg.textContent = 'Report content unavailable.';
-      wrapper.appendChild(msg);
-    }
-
-    pdfReports.appendChild(wrapper);
-  });
-
-  pdfSection.style.display = 'block';
-  pdfSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
-}
-
-function printFrame(frameId) {
-  const frame = document.getElementById(frameId);
-  if (!frame || !frame.contentWindow) return;
-  frame.contentWindow.focus();
-  frame.contentWindow.print();
-}
-
-function decodeBase64Utf8(base64) {
-  try {
-    const bytes = Uint8Array.from(atob(base64), c => c.charCodeAt(0));
-    return new TextDecoder('utf-8').decode(bytes);
-  } catch {
-    return atob(base64);
-  }
-}
+if (createPdfBtn) createPdfBtn.onclick = () => window.print();

@@ -323,9 +323,57 @@ public static class Apis
             var names = await blobStorageService.ListBlobNamesAsync("market-insight");
             var reports = names
                 .OrderByDescending(n => n, StringComparer.Ordinal)
-                .Select(n => new { filename = n, date = ExtractInsightDate(n) })
+                .Select(n =>
+                {
+                    var market = ExtractInsightMarket(n);
+                    return new { filename = n, date = ExtractInsightDate(n), market };
+                })
                 .ToArray();
             return Results.Json(new { reports });
+        });
+
+        app.MapGet("/api/insight/content", async (string name) =>
+        {
+            if (string.IsNullOrWhiteSpace(name))
+                return Results.Json(new { status = "error", error = "name is required." });
+            var content = await blobStorageService.ReadTextAsync("market-insight", name);
+            if (content is null)
+                return Results.Json(new { status = "error", error = "Insight not found." });
+            return Results.Json(new { status = "ok", content });
+        });
+
+        app.MapGet("/api/market/research/list", async () =>
+        {
+            var names = await blobStorageService.ListBlobNamesAsync("market-research");
+            var reports = names
+                .OrderByDescending(n => n, StringComparer.Ordinal)
+                .Select(n =>
+                {
+                    // filename format: {weekStart}-{market}_research.json
+                    var stem = System.IO.Path.GetFileNameWithoutExtension(n); // e.g. 2026-06-02-copper_research
+                    string? weekStart = null, market = null;
+                    var suffixIdx = stem.LastIndexOf("_research", StringComparison.OrdinalIgnoreCase);
+                    if (suffixIdx > 10)
+                    {
+                        var datePart = stem[..10]; // yyyy-MM-dd
+                        var marketPart = stem[(datePart.Length + 1)..suffixIdx]; // skip the dash
+                        weekStart = datePart;
+                        market = marketPart;
+                    }
+                    return new { filename = n, weekStart, market };
+                })
+                .ToArray();
+            return Results.Json(new { reports });
+        });
+
+        app.MapGet("/api/market/research/content", async (string name) =>
+        {
+            if (string.IsNullOrWhiteSpace(name))
+                return Results.Json(new { status = "error", error = "name is required." });
+            var content = await blobStorageService.ReadTextAsync("market-research", name);
+            if (content is null)
+                return Results.Json(new { status = "error", error = "Research not found." });
+            return Results.Json(new { status = "ok", content });
         });
 
         app.MapGet("/api/insight/byDate", async (string date) =>
@@ -455,6 +503,14 @@ public static class Apis
         var token = Path.GetFileName(filename).Split('_', '.').FirstOrDefault();
         return DateTime.TryParseExact(token, "yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture,
             System.Globalization.DateTimeStyles.None, out _) ? token : null;
+    }
+
+    private static string? ExtractInsightMarket(string filename)
+    {
+        // filename format: {date}_{market}_insight.md
+        var stem = Path.GetFileNameWithoutExtension(filename);
+        var parts = stem.Split('_');
+        return parts.Length >= 2 ? parts[1] : null;
     }
 
     private static async Task<(string Date, string Content, string Filename)> ReadLatestInsightAsync(BlobStorageService blobStorageService)

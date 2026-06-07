@@ -74,6 +74,7 @@ btn.onclick = async () => {
     const json = await response.json();
     if (json.status === 'error') throw new Error(json.error || 'Research failed.');
     renderResult(json);
+    await loadResearchTable();
   } catch (e) {
     resultEl.innerHTML = `<p class="research-error">Error: ${escapeHtml(e.message)}</p>`;
   } finally {
@@ -81,3 +82,54 @@ btn.onclick = async () => {
     spinner.hidden = true;
   }
 };
+
+async function previewResearch(filename) {
+  showModal(filename, 'Loading…');
+  try {
+    const response = await fetch(`/api/market/research/content?name=${encodeURIComponent(filename)}`);
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    const data = await response.json();
+    if (data.status !== 'ok') throw new Error(data.error || 'Failed to load content.');
+    showModalWithTabs(filename, data.content, data.content);
+  } catch (e) {
+    showModal(filename, `Error: ${e.message}`);
+  }
+}
+
+function renderResearchTable(reports) {
+  const tableEl = document.getElementById('research-table');
+  if (!tableEl) return;
+  if (!reports || reports.length === 0) {
+    tableEl.innerHTML = '<p>No research history yet.</p>';
+    return;
+  }
+  const rows = reports.map(r => `
+    <tr class="analysis-row" data-name="${escapeHtml(r.filename)}">
+      <td>${escapeHtml(r.filename)}</td>
+      <td>${escapeHtml(r.market || '')}</td>
+      <td>${escapeHtml(r.weekStart || '')}</td>
+    </tr>`).join('');
+  tableEl.innerHTML = `
+    <table class="analysis">
+      <thead><tr><th>File</th><th>Market</th><th>Week Start</th></tr></thead>
+      <tbody>${rows}</tbody>
+    </table>`;
+  tableEl.querySelectorAll('.analysis-row').forEach(row => {
+    row.onclick = () => previewResearch(row.dataset.name);
+  });
+}
+
+async function loadResearchTable() {
+  const tableEl = document.getElementById('research-table');
+  if (tableEl) tableEl.innerHTML = '<p>Loading research history...</p>';
+  try {
+    const response = await fetch('/api/market/research/list');
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    const data = await response.json();
+    renderResearchTable(data.reports || []);
+  } catch (e) {
+    if (tableEl) tableEl.innerHTML = `Error: ${escapeHtml(e.message)}`;
+  }
+}
+
+loadResearchTable();

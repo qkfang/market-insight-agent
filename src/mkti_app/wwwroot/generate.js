@@ -56,6 +56,7 @@ btn.onclick = async () => {
     const json = await response.json();
     if (json.status === 'error') throw new Error(json.error || 'Generation failed.');
     renderResult(json);
+    await loadGenerateTable();
   } catch (e) {
     resultEl.innerHTML = `<p class="research-error">Error: ${escapeHtml(e.message)}</p>`;
   } finally {
@@ -63,3 +64,54 @@ btn.onclick = async () => {
     spinner.hidden = true;
   }
 };
+
+async function previewInsight(filename) {
+  showModal(filename, 'Loading…');
+  try {
+    const response = await fetch(`/api/insight/content?name=${encodeURIComponent(filename)}`);
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    const data = await response.json();
+    if (data.status !== 'ok') throw new Error(data.error || 'Failed to load content.');
+    showModalWithTabs(filename, data.content, data.content);
+  } catch (e) {
+    showModal(filename, `Error: ${e.message}`);
+  }
+}
+
+function renderGenerateTable(reports) {
+  const tableEl = document.getElementById('generate-table');
+  if (!tableEl) return;
+  if (!reports || reports.length === 0) {
+    tableEl.innerHTML = '<p>No generated insights yet.</p>';
+    return;
+  }
+  const rows = reports.map(r => `
+    <tr class="analysis-row" data-name="${escapeHtml(r.filename)}">
+      <td>${escapeHtml(r.filename)}</td>
+      <td>${escapeHtml(r.market || '')}</td>
+      <td>${escapeHtml(r.date || '')}</td>
+    </tr>`).join('');
+  tableEl.innerHTML = `
+    <table class="analysis">
+      <thead><tr><th>File</th><th>Market</th><th>Date</th></tr></thead>
+      <tbody>${rows}</tbody>
+    </table>`;
+  tableEl.querySelectorAll('.analysis-row').forEach(row => {
+    row.onclick = () => previewInsight(row.dataset.name);
+  });
+}
+
+async function loadGenerateTable() {
+  const tableEl = document.getElementById('generate-table');
+  if (tableEl) tableEl.innerHTML = '<p>Loading generated insights...</p>';
+  try {
+    const response = await fetch('/api/insight/list');
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    const data = await response.json();
+    renderGenerateTable(data.reports || []);
+  } catch (e) {
+    if (tableEl) tableEl.innerHTML = `Error: ${escapeHtml(e.message)}`;
+  }
+}
+
+loadGenerateTable();

@@ -150,29 +150,55 @@ public static class Apis
 
         app.MapGet("/api/market/research", async () =>
         {
-            var result = await marketResearchAgent.RunAsync(
-                "Research the current copper market sentiment based on latest news and Bing search results");
+            var markets = new[] { "copper", "gold", "silver", "oil" };
 
-            var (sentiment, confidence, keyDrivers, summary) = ParseSentiment(result);
-            var timestamp = DateTime.UtcNow.ToString("o");
+            // Compute the Monday (weekStart) and Sunday (weekEnd) for the current UTC week.
+            var today = DateTime.UtcNow.Date;
+            var daysFromMonday = ((int)today.DayOfWeek + 6) % 7;
+            var weekStart = today.AddDays(-daysFromMonday);
+            var weekEnd = weekStart.AddDays(6);
+            var weekStartStr = weekStart.ToString("yyyy-MM-dd");
+            var weekEndStr = weekEnd.ToString("yyyy-MM-dd");
 
-            var researchDate = DateTime.UtcNow.ToString("yyyy-MM-dd");
-            var researchFilename = $"{researchDate}_copper_research.json";
-            var researchJson = System.Text.Json.JsonSerializer.Serialize(
-                new { sentiment, confidence, keyDrivers, summary, timestamp });
-            await blobStorageService.WriteTextAsync(
-                "market-research", researchFilename, researchJson, "application/json");
-            await fabricLakehouseService.WriteFileAsync(
-                $"market-research/{researchFilename}", researchJson);
+            var results = new List<object>();
+            foreach (var market in markets)
+            {
+                var message =
+                    $"Research the {market} market for the week {weekStartStr} to {weekEndStr}. " +
+                    $"market={market}, weekStart={weekStartStr}, weekEnd={weekEndStr}. " +
+                    $"Use read_news_analysis_by_market for market '{market}', " +
+                    $"use bing_search_market for market '{market}' with week range '{weekStartStr} to {weekEndStr}', " +
+                    $"then call store_weekly_market_research with market='{market}', weekStart='{weekStartStr}'.";
+
+                var result = await marketResearchAgent.RunAsync(message);
+
+                string? sentiment = null, summary = null;
+                double? confidence = null;
+                string[]? keyDrivers = null;
+                if (!string.IsNullOrWhiteSpace(result))
+                {
+                    try
+                    {
+                        using var doc = System.Text.Json.JsonDocument.Parse(result);
+                        var root = doc.RootElement;
+                        if (root.TryGetProperty("sentiment", out var s)) sentiment = s.GetString();
+                        if (root.TryGetProperty("confidence", out var c) && c.TryGetDouble(out var cv)) confidence = cv;
+                        if (root.TryGetProperty("summary", out var sum)) summary = sum.GetString();
+                        if (root.TryGetProperty("keyDrivers", out var kd) && kd.ValueKind == System.Text.Json.JsonValueKind.Array)
+                            keyDrivers = kd.EnumerateArray().Select(e => e.GetString() ?? string.Empty).ToArray();
+                    }
+                    catch { /* leave nulls if JSON can't be parsed */ }
+                }
+
+                results.Add(new { market, weekStart = weekStartStr, weekEnd = weekEndStr, sentiment, confidence, keyDrivers, summary });
+            }
 
             return Results.Json(new
             {
                 status = "ok",
-                sentiment,
-                confidence,
-                keyDrivers,
-                summary,
-                timestamp
+                weekStart = weekStartStr,
+                weekEnd = weekEndStr,
+                markets = results
             });
         });
 

@@ -458,6 +458,97 @@ public sealed class MarketInsightMcpTools
         return JsonSerializer.Serialize(items, JsonOptions);
     }
 
+    [McpServerTool(Name = "bing_search_market"), Description("Search Bing for current price and market news for a given commodity market. Returns a JSON array of up to 5 results with { title, snippet, url }.")]
+    public async Task<string> BingSearchMarket(
+        [Description("Market name, e.g. 'copper', 'gold', 'silver', 'oil'.")] string market,
+        [Description("Optional week range hint, e.g. '2026-06-02 to 2026-06-08'.")] string? weekRange = null)
+    {
+        if (string.IsNullOrWhiteSpace(market))
+            return "Error: market is required.";
+
+        if (!_bingSearchService.IsConfigured)
+            return "Error: Bing Search is not configured (set BING_SEARCH_API_KEY and BING_SEARCH_ENDPOINT).";
+
+        var query = string.IsNullOrWhiteSpace(weekRange)
+            ? $"{market} price today market sentiment this week"
+            : $"{market} price market news {weekRange}";
+
+        var results = await _bingSearchService.SearchAsync(query, 5);
+        var items = results
+            .Select(r => new { title = r.Title, snippet = r.Snippet, url = r.Url })
+            .ToArray();
+
+        return JsonSerializer.Serialize(items, JsonOptions);
+    }
+
+    [McpServerTool(Name = "read_news_analysis_by_market"), Description("Read the N most recent news-analysis documents that mention the specified market keyword. Returns a JSON array of { filename, title, date, source, markdownContent }.")]
+    public async Task<string> ReadNewsAnalysisByMarket(
+        [Description("Market keyword to filter by, e.g. 'copper', 'gold', 'silver', 'oil'.")] string market,
+        [Description("Maximum number of matching documents to return. Defaults to 10.")] int count = 10)
+    {
+        if (string.IsNullOrWhiteSpace(market))
+            return "Error: market is required.";
+
+        var names = await _blobStorageService.ListRecentBlobNamesAsync(NewsAnalysisContainer, 100);
+        var items = new List<object>();
+
+        foreach (var name in names)
+        {
+            if (items.Count >= count) break;
+
+            var content = await _blobStorageService.ReadTextAsync(NewsAnalysisContainer, name);
+            if (string.IsNullOrWhiteSpace(content)) continue;
+
+            string? title = null, date = null, source = null, markdownContent = null;
+            try
+            {
+                using var doc = JsonDocument.Parse(content);
+                var root = doc.RootElement;
+                if (root.TryGetProperty("title", out var t)) title = t.GetString();
+                if (root.TryGetProperty("date", out var d)) date = d.GetString();
+                if (root.TryGetProperty("source", out var s)) source = s.GetString();
+                if (root.TryGetProperty("markdownContent", out var m)) markdownContent = m.GetString();
+            }
+            catch (JsonException)
+            {
+                markdownContent = content;
+            }
+
+            // Include article only if it mentions the market keyword.
+            var searchText = $"{title} {markdownContent}";
+            if (searchText.Contains(market, StringComparison.OrdinalIgnoreCase))
+                items.Add(new { filename = name, title, date, source, markdownContent });
+        }
+
+        return JsonSerializer.Serialize(items, JsonOptions);
+    }
+
+    [McpServerTool(Name = "store_weekly_market_research"), Description("Write or update a weekly market research JSON file in the market-research blob container and Fabric Lakehouse. File name: {weekStart}-{market}_research.json.")]
+    public async Task<string> StoreWeeklyMarketResearch(
+        [Description("Market name, e.g. 'copper', 'gold', 'silver', 'oil'.")] string market,
+        [Description("Week start date (Monday) in yyyy-MM-dd format.")] string weekStart,
+        [Description("Full research JSON content as a string.")] string researchJson)
+    {
+        if (string.IsNullOrWhiteSpace(market))
+            return "Error: market is required.";
+        if (string.IsNullOrWhiteSpace(weekStart))
+            return "Error: weekStart is required.";
+        if (string.IsNullOrWhiteSpace(researchJson))
+            return "Error: researchJson is required.";
+
+        var safeMarket = market.ToLowerInvariant().Trim();
+        var filename = $"{weekStart.Trim()}-{safeMarket}_research.json";
+
+        await _blobStorageService.WriteTextAsync(MarketResearchContainer, filename, researchJson, "application/json");
+        await _fabricLakehouseService.WriteFileAsync($"market-research/{filename}", researchJson);
+
+        return JsonSerializer.Serialize(new
+        {
+            filename,
+            blobUrl = _blobStorageService.GetBlobUrl(MarketResearchContainer, filename)
+        }, JsonOptions);
+    }
+
     [McpServerTool(Name = "get_copper_sentiment_summary"), Description("Format a JSON array of article summaries into a single prompt-friendly text block for sentiment analysis. Returns the formatted text.")]
     public string GetCopperSentimentSummary(
         [Description("JSON array of article summaries.")] string articles)
@@ -531,6 +622,91 @@ public sealed class MarketInsightMcpTools
             summary = content,
             timestamp = ExtractDateFromName(latest)
         }, JsonOptions);
+    }
+
+    [McpServerTool(Name = "list_market_research_history"), Description("List all market-research JSON files from the market-research blob container whose week start date is on or before the specified cutoff date, ordered from oldest to newest. Returns a JSON array of { filename, weekStart, weekEnd, market, sentiment, confidence, keyDrivers, summary, bingNews, newsAnalysisArticles }. Use this to build a historical timeline of market view changes.")]
+    public async Task<string> ListMarketResearchHistory(
+        [Description("Market name to filter by, e.g. 'copper'. Leave empty to include all markets.")] string? market = null,
+        [Description("Cutoff date (inclusive) in yyyy-MM-dd format. Only files with a weekStart on or before this date are included. Defaults to today's UTC date when omitted.")] string? upToDate = null)
+    {
+        var cutoff = string.IsNullOrWhiteSpace(upToDate)
+            ? DateTime.UtcNow.Date
+            : DateTime.TryParseExact(upToDate.Trim(), "yyyy-MM-dd", CultureInfo.InvariantCulture,
+                DateTimeStyles.None, out var d) ? d.Date : DateTime.UtcNow.Date;
+
+        var names = await _blobStorageService.ListBlobNamesAsync(MarketResearchContainer);
+        var items = new List<object>();
+
+        foreach (var name in names.OrderBy(n => n, StringComparer.Ordinal))
+        {
+            // Filename format: {weekStart}-{market}_research.json
+            var stem = Path.GetFileNameWithoutExtension(name);
+            var dashIdx = stem.IndexOf('-', 8); // skip past yyyy-MM-dd
+            var weekStartStr = dashIdx > 0 ? stem[..dashIdx] : stem[..Math.Min(10, stem.Length)];
+
+            if (!DateTime.TryParseExact(weekStartStr, "yyyy-MM-dd", CultureInfo.InvariantCulture,
+                DateTimeStyles.None, out var weekStartDate))
+                continue;
+
+            if (weekStartDate.Date > cutoff)
+                continue;
+
+            var content = await _blobStorageService.ReadTextAsync(MarketResearchContainer, name);
+            if (string.IsNullOrWhiteSpace(content)) continue;
+
+            object entry;
+            try
+            {
+                using var doc = JsonDocument.Parse(content);
+                var root = doc.RootElement.Clone();
+
+                string? fileMarket = root.TryGetProperty("market", out var mProp) ? mProp.GetString() : null;
+                if (!string.IsNullOrWhiteSpace(market) &&
+                    !string.Equals(fileMarket, market, StringComparison.OrdinalIgnoreCase))
+                    continue;
+
+                string? weekEnd = root.TryGetProperty("weekEnd", out var weProp) ? weProp.GetString() : null;
+                string? sentiment = root.TryGetProperty("sentiment", out var sProp) ? sProp.GetString() : null;
+                double? confidence = root.TryGetProperty("confidence", out var cProp) && cProp.TryGetDouble(out var cv) ? cv : null;
+                string? summary = root.TryGetProperty("summary", out var sumProp) ? sumProp.GetString() : null;
+
+                var keyDrivers = new List<string>();
+                if (root.TryGetProperty("keyDrivers", out var kdProp) && kdProp.ValueKind == JsonValueKind.Array)
+                    foreach (var kd in kdProp.EnumerateArray())
+                        if (kd.GetString() is { } s) keyDrivers.Add(s);
+
+                var bingNews = root.TryGetProperty("bingNews", out var bnProp)
+                    ? JsonSerializer.Deserialize<object[]>(bnProp.GetRawText())
+                    : null;
+
+                var newsAnalysisArticles = root.TryGetProperty("newsAnalysisArticles", out var naProp)
+                    ? JsonSerializer.Deserialize<object[]>(naProp.GetRawText())
+                    : null;
+
+                entry = new
+                {
+                    filename = name,
+                    weekStart = weekStartStr,
+                    weekEnd,
+                    market = fileMarket,
+                    sentiment,
+                    confidence,
+                    keyDrivers,
+                    summary,
+                    bingNews,
+                    newsAnalysisArticles
+                };
+            }
+            catch (JsonException)
+            {
+                if (!string.IsNullOrWhiteSpace(market)) continue;
+                entry = new { filename = name, weekStart = weekStartStr, weekEnd = (string?)null, market = (string?)null, sentiment = (string?)null, confidence = (double?)null, keyDrivers = new List<string>(), summary = content, bingNews = (object[]?)null, newsAnalysisArticles = (object[]?)null };
+            }
+
+            items.Add(entry);
+        }
+
+        return JsonSerializer.Serialize(items, JsonOptions);
     }
 
     [McpServerTool(Name = "store_market_insight"), Description("Store the daily copper market insight markdown to the market-insight blob container as {date}_copper_insight.md and to the Fabric Lakehouse market-insight/ folder. Returns JSON with the blob URL, filename and date.")]

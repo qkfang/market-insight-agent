@@ -17,7 +17,10 @@ function renderFiles(filenames) {
 
 async function loadExisting() {
   try {
-    const response = await fetch('/api/news/list');
+    const params = new URLSearchParams();
+    if (fromInput.value) params.set('from', fromInput.value);
+    if (toInput.value) params.set('to', toInput.value);
+    const response = await fetch(`/api/articles/list?${params}`);
     if (!response.ok) return;
     const json = await response.json();
     renderFiles(json.filenames);
@@ -27,6 +30,9 @@ async function loadExisting() {
 }
 
 loadExisting();
+
+fromInput.addEventListener('change', loadExisting);
+toInput.addEventListener('change', loadExisting);
 
 btn.onclick = async () => {
   btn.disabled = true;

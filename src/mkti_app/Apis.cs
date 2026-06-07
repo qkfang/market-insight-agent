@@ -6,9 +6,8 @@ namespace mkti_app;
 public static class Apis
 {
     private const string DataFolderName = "data";
+    private const string ArticlesFolderName = "articles";
     private const string KnowledgeArticlesFileName = "articles.json";
-    private const string MockRssArticlesFileName = "articles-june.json";
-    private const string MockRssFallbackFileName = "articles.json";
     private const int KnowledgeTopArticleCount = 3;
     private const int InsightPreviewMaxLength = 500;
 
@@ -24,10 +23,10 @@ public static class Apis
         app.MapGet("/api/news/ingest", async (string? from, string? to) =>
         {
             var before = await blobStorageService.ListBlobNamesAsync("news-store");
-            var dateRange = (!string.IsNullOrWhiteSpace(from) && !string.IsNullOrWhiteSpace(to))
-                ? $" Only include articles published between {from} and {to} (inclusive)."
+            var dateArgs = (!string.IsNullOrWhiteSpace(from) && !string.IsNullOrWhiteSpace(to))
+                ? $" Use dateFrom='{from}' and dateTo='{to}'."
                 : string.Empty;
-            var result = await newsIngestionAgent.RunAsync($"Ingest local articles-june.json and store each full article JSON object in news-store using {{yyyyMMddHHmmssfff}}_{{guid}}.json blob names.{dateRange}");
+            var result = await newsIngestionAgent.RunAsync($"Ingest articles from the data/articles/ folder and store each one in news-store using {{yyyyMMddHHmmssfff}}_{{guid}}.json blob names.{dateArgs}");
             var after = await blobStorageService.ListBlobNamesAsync("news-store");
 
             var delta = after.Count - before.Count;
@@ -45,6 +44,33 @@ public static class Apis
         app.MapGet("/api/news/list", async () =>
         {
             var filenames = await blobStorageService.ListBlobNamesAsync("news-store");
+            return Results.Json(new { success = true, filenames });
+        });
+
+        app.MapGet("/api/articles/list", (string? from, string? to, IWebHostEnvironment env) =>
+        {
+            var articlesDir = Path.Combine(env.ContentRootPath, DataFolderName, ArticlesFolderName);
+            if (!Directory.Exists(articlesDir))
+                return Results.Json(new { success = true, filenames = Array.Empty<string>() });
+
+            DateOnly? fromDate = null, toDate = null;
+            if (!string.IsNullOrWhiteSpace(from) && DateOnly.TryParse(from, out var fd)) fromDate = fd;
+            if (!string.IsNullOrWhiteSpace(to) && DateOnly.TryParse(to, out var td)) toDate = td;
+
+            var filenames = Directory.GetFiles(articlesDir, "*.json", SearchOption.TopDirectoryOnly)
+                .Where(f =>
+                {
+                    var prefix = Path.GetFileNameWithoutExtension(f);
+                    if (prefix.Length < 10) return false;
+                    if (!DateOnly.TryParse(prefix[..10], out var fileDate)) return false;
+                    if (fromDate.HasValue && fileDate < fromDate.Value) return false;
+                    if (toDate.HasValue && fileDate > toDate.Value) return false;
+                    return true;
+                })
+                .OrderBy(f => f)
+                .Select(Path.GetFileName)
+                .ToArray();
+
             return Results.Json(new { success = true, filenames });
         });
 
@@ -258,56 +284,6 @@ public static class Apis
             });
         });
 
-        app.MapGet("/api/mock/rss", async (HttpContext context, IWebHostEnvironment env) =>
-        {
-            var (jsonPath, articles) = await LoadMockArticlesAsync(env, MockRssArticlesFileName, MockRssFallbackFileName);
-            if (string.IsNullOrWhiteSpace(jsonPath))
-                return Results.NotFound($"{MockRssArticlesFileName} not found");
-
-            var baseUrl = $"{context.Request.Scheme}://{context.Request.Host}";
-
-            if (articles.Count == 0)
-                return Results.Content("<rss version=\"2.0\"><channel><title>Copper Market News</title></channel></rss>", "application/rss+xml");
-
-            var itemsXml = string.Join("\n", articles.Select(a =>
-                $"""
-                <item>
-                  <title><![CDATA[{a.Title}]]></title>
-                  <link>{baseUrl}/api/mock/article/{a.Id}</link>
-                  <pubDate>{a.PublishDate}</pubDate>
-                  <description><![CDATA[{a.Description}]]></description>
-                </item>
-                """));
-
-            var rss = $"""
-                <?xml version="1.0" encoding="UTF-8"?>
-                <rss version="2.0">
-                  <channel>
-                    <title>Copper Market News (Mock)</title>
-                    <link>{baseUrl}/api/mock/rss</link>
-                    <description>Mock copper market news articles for development and testing</description>
-                    <language>en-us</language>
-                    {itemsXml}
-                  </channel>
-                </rss>
-                """;
-
-            return Results.Content(rss, "application/rss+xml");
-        });
-
-        app.MapGet("/api/mock/article/{id}", async (string id, IWebHostEnvironment env) =>
-        {
-            var (jsonPath, articles) = await LoadMockArticlesAsync(env, MockRssArticlesFileName, MockRssFallbackFileName);
-            if (string.IsNullOrWhiteSpace(jsonPath))
-                return Results.NotFound($"{MockRssArticlesFileName} not found");
-
-            var article = articles?.FirstOrDefault(a => a.Id == id);
-            if (article is null)
-                return Results.NotFound($"Article '{id}' not found");
-
-            return Results.Content(article.HtmlContent, "text/html");
-        });
-
         app.MapGet("/api/subscription", async (HttpContext context) =>
         {
             var userId = ResolveUserId(context);
@@ -422,60 +398,7 @@ public static class Apis
         return text.Substring(start, end - start + 1);
     }
 
-    private static async Task<(string? Path, List<MockArticle> Articles)> LoadMockArticlesAsync(
-        IWebHostEnvironment env,
-        string primaryFileName,
-        string? fallbackFileName = null)
-    {
-        string? resolvedPath = null;
-        var dataRootPath = Path.Combine(env.ContentRootPath, DataFolderName);
-        var primaryPath = Path.Combine(dataRootPath, primaryFileName);
-        if (File.Exists(primaryPath))
-            resolvedPath = primaryPath;
-        else if (!string.IsNullOrWhiteSpace(fallbackFileName))
-        {
-            var fallbackPath = Path.Combine(dataRootPath, fallbackFileName);
-            if (File.Exists(fallbackPath))
-                resolvedPath = fallbackPath;
-        }
-
-        if (string.IsNullOrWhiteSpace(resolvedPath))
-            return (null, []);
-
-        var json = await File.ReadAllTextAsync(resolvedPath);
-        try
-        {
-            var articles = System.Text.Json.JsonSerializer.Deserialize<List<MockArticle>>(
-                json,
-                new System.Text.Json.JsonSerializerOptions { PropertyNameCaseInsensitive = true });
-            return (resolvedPath, articles ?? []);
-        }
-        catch (System.Text.Json.JsonException)
-        {
-            return (resolvedPath, []);
-        }
-    }
-
-    private static string BuildKnowledgeFilename(MockArticle article)
-    {
-        var id = string.IsNullOrWhiteSpace(article.Id) ? Guid.NewGuid().ToString("N")[..8] : article.Id.Trim();
-        var title = string.IsNullOrWhiteSpace(article.Title) ? "article" : article.Title;
-        var slug = new string(title
-            .ToLowerInvariant()
-            .Select(c => char.IsLetterOrDigit(c) ? c : '-')
-            .ToArray());
-        while (slug.Contains("--", StringComparison.Ordinal))
-            slug = slug.Replace("--", "-", StringComparison.Ordinal);
-        slug = slug.Trim('-');
-        if (slug.Length > 60)
-            slug = slug[..60].Trim('-');
-        if (string.IsNullOrWhiteSpace(slug))
-            slug = "article";
-        return $"{id}-{slug}.html";
-    }
 }
-
-public sealed record MockArticle(string Id, string Title, string PublishDate, string Description, string HtmlContent);
 
 public sealed record SubscriptionRequest(IReadOnlyList<string> Markets, IReadOnlyList<string> Items)
 {

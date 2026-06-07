@@ -16,8 +16,8 @@ namespace mkti_app.Mcp;
 public sealed class MarketInsightMcpTools
 {
     private const string DataFolderName = "data";
+    private const string ArticlesFolderName = "articles";
     private const string ArticlesFilePattern = "articles-*.json";
-    private const string FallbackArticlesFileName = "articles.json";
     private const string NewsStoreContainer = "news-store";
     private const string NewsAnalysisContainer = "news-analysis";
     private const string MarketInsightContainer = "market-insight";
@@ -52,45 +52,63 @@ public sealed class MarketInsightMcpTools
         _defaultRssFeeds = [$"{appMcpUrl.TrimEnd('/')}/api/mock/rss"];
     }
 
-    [McpServerTool(Name = "ingest_articles_json_to_news_store"), Description("Load local articles-june.json and store each article object unchanged to the news-store container and Fabric Lakehouse news-store folder. Blob name format is {yyyyMMddHHmmssfff}_{guid}.json where timestamp comes from the article datetime and guid comes from JSON.")]
+    [McpServerTool(Name = "ingest_articles_json_to_news_store"), Description("Load individual article JSON files from the data/articles/ folder and store each one to the news-store container and Fabric Lakehouse news-store folder. Files are named yyyy-MM-dd_<guid>.json and can be filtered by date range. Blob name format is {yyyyMMddHHmmssfff}_{guid}.json.")]
     public async Task<string> IngestArticlesJsonToNewsStore(
-        [Description("Optional JSON filename under the app data folder, e.g. articles-june.json. Defaults to latest articles-*.json, then articles.json.")] string? fileName = null)
+        [Description("Optional inclusive start date filter in yyyy-MM-dd format, e.g. 2026-06-01. Only articles whose filename date is on or after this date are ingested.")] string? dateFrom = null,
+        [Description("Optional inclusive end date filter in yyyy-MM-dd format, e.g. 2026-06-07. Only articles whose filename date is on or before this date are ingested.")] string? dateTo = null)
     {
-        var resolvedPath = ResolveArticlesFilePath(fileName);
-        if (resolvedPath is null)
-            return "Error: no articles JSON file found in the data folder.";
+        var articlesDir = Path.Combine(_environment.ContentRootPath, DataFolderName, ArticlesFolderName);
+        if (!Directory.Exists(articlesDir))
+            return $"Error: articles directory not found at '{articlesDir}'.";
 
-        var payload = await File.ReadAllTextAsync(resolvedPath);
-        JsonDocument doc;
-        try
-        {
-            doc = JsonDocument.Parse(payload);
-        }
-        catch (JsonException ex)
-        {
-            return $"Error: invalid JSON in '{Path.GetFileName(resolvedPath)}': {ex.Message}";
-        }
+        DateOnly? fromDate = null, toDate = null;
+        if (!string.IsNullOrWhiteSpace(dateFrom) && DateOnly.TryParse(dateFrom, out var fd)) fromDate = fd;
+        if (!string.IsNullOrWhiteSpace(dateTo) && DateOnly.TryParse(dateTo, out var td)) toDate = td;
 
-        using (doc)
-        {
-            if (doc.RootElement.ValueKind != JsonValueKind.Array)
-                return $"Error: '{Path.GetFileName(resolvedPath)}' must contain a JSON array of article objects.";
-
-            var stored = new List<string>();
-            var skipped = new List<object>();
-
-            foreach (var article in doc.RootElement.EnumerateArray())
+        var files = Directory.GetFiles(articlesDir, "*.json", SearchOption.TopDirectoryOnly)
+            .Where(f =>
             {
-                if (article.ValueKind != JsonValueKind.Object)
+                var prefix = Path.GetFileNameWithoutExtension(f);
+                if (prefix.Length < 10) return false;
+                if (!DateOnly.TryParse(prefix[..10], out var fileDate)) return false;
+                if (fromDate.HasValue && fileDate < fromDate.Value) return false;
+                if (toDate.HasValue && fileDate > toDate.Value) return false;
+                return true;
+            })
+            .OrderBy(f => f)
+            .ToArray();
+
+        if (files.Length == 0)
+            return JsonSerializer.Serialize(new { storedCount = 0, skippedCount = 0, filenames = Array.Empty<string>(), skipped = Array.Empty<object>() }, JsonOptions);
+
+        var stored = new List<string>();
+        var skipped = new List<object>();
+
+        foreach (var filePath in files)
+        {
+            var fileLabel = Path.GetFileName(filePath);
+            string payload;
+            try { payload = await File.ReadAllTextAsync(filePath); }
+            catch (Exception ex) { skipped.Add(new { file = fileLabel, reason = $"read error: {ex.Message}" }); continue; }
+
+            JsonDocument doc;
+            try { doc = JsonDocument.Parse(payload); }
+            catch (JsonException ex) { skipped.Add(new { file = fileLabel, reason = $"invalid JSON: {ex.Message}" }); continue; }
+
+            using (doc)
+            {
+                if (doc.RootElement.ValueKind != JsonValueKind.Object)
                 {
-                    skipped.Add(new { reason = "non-object article entry" });
+                    skipped.Add(new { file = fileLabel, reason = "not a JSON object" });
                     continue;
                 }
+
+                var article = doc.RootElement;
 
                 if (!TryGetGuidFromArticle(article, out var articleGuid))
                 {
                     var id = TryGetString(article, "id") ?? "(unknown)";
-                    skipped.Add(new { id, reason = "missing or invalid guid" });
+                    skipped.Add(new { file = fileLabel, id, reason = "missing or invalid guid" });
                     continue;
                 }
 
@@ -99,25 +117,26 @@ public sealed class MarketInsightMcpTools
 
                 if (await _blobStorageService.ExistsAsync(NewsStoreContainer, blobName))
                 {
-                    skipped.Add(new { guid = articleGuid.ToString("D"), reason = "already exists", blobName });
+                    skipped.Add(new { file = fileLabel, guid = articleGuid.ToString("D"), reason = "already exists", blobName });
                     continue;
                 }
 
-                var articleJson = article.GetRawText();
-                await _blobStorageService.WriteTextAsync(NewsStoreContainer, blobName, articleJson, "application/json");
-                await _fabricLakehouseService.WriteFileAsync($"news-store/{blobName}", articleJson);
+                await _blobStorageService.WriteTextAsync(NewsStoreContainer, blobName, payload, "application/json");
+                await _fabricLakehouseService.WriteFileAsync($"news-store/{blobName}", payload);
                 stored.Add(blobName);
             }
-
-            return JsonSerializer.Serialize(new
-            {
-                sourceFile = Path.GetFileName(resolvedPath),
-                storedCount = stored.Count,
-                skippedCount = skipped.Count,
-                filenames = stored,
-                skipped
-            }, JsonOptions);
         }
+
+        return JsonSerializer.Serialize(new
+        {
+            sourceFolder = ArticlesFolderName,
+            dateFrom = dateFrom ?? "(none)",
+            dateTo = dateTo ?? "(none)",
+            storedCount = stored.Count,
+            skippedCount = skipped.Count,
+            filenames = stored,
+            skipped
+        }, JsonOptions);
     }
 
     [McpServerTool(Name = "fetch_rss_feed"), Description("Download and parse a copper market RSS/Atom feed. Returns a JSON array of articles with title, url, publishDate and description.")]
@@ -864,7 +883,7 @@ public sealed class MarketInsightMcpTools
 
     [McpServerTool(Name = "enrich_articles_html"), Description("For each article in a local articles JSON file, download the full HTML page from originalUrl and replace the htmlContent field. Saves the updated file in place. Returns a summary of enriched and skipped articles.")]
     public async Task<string> EnrichArticlesHtml(
-        [Description("Optional JSON filename under the app data folder, e.g. articles-june.json. Defaults to latest articles-*.json, then articles.json.")] string? fileName = null)
+        [Description("Optional JSON filename under the app data folder. Defaults to latest articles-*.json.")] string? fileName = null)
     {
         var resolvedPath = ResolveArticlesFilePath(fileName);
         if (resolvedPath is null)
@@ -1059,11 +1078,7 @@ public sealed class MarketInsightMcpTools
         var latestMatching = Directory.GetFiles(dataRoot, ArticlesFilePattern, SearchOption.TopDirectoryOnly)
             .OrderByDescending(File.GetLastWriteTimeUtc)
             .FirstOrDefault();
-        if (!string.IsNullOrWhiteSpace(latestMatching))
-            return latestMatching;
-
-        var fallback = Path.Combine(dataRoot, FallbackArticlesFileName);
-        return File.Exists(fallback) ? fallback : null;
+        return latestMatching;
     }
 
     private static string? TryGetString(JsonElement article, string propertyName)

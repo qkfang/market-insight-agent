@@ -31,34 +31,75 @@
     <a href="/research.html">Market Research</a>
     <a href="/generate.html">Insight Generation</a>
     <a href="/subscription.html" class="active">Subscription</a>
-    <a href="/delivery.html">Insight Delivery</a>
   </nav>
   <main class="app-main">
+
+    <!-- Report Generation Panel -->
     <div class="panel">
       <div class="panel-header">
         <div>
-          <h2 class="panel-title">Insight Subscription</h2>
-          <p class="panel-desc">Configure which markets and report types you want to receive alerts and daily reports for.</p>
+          <h2 class="panel-title">Subscription Report Generator</h2>
+          <p class="panel-desc">Select markets, audience, and date range to generate a branded PDF insight report for a customer.</p>
         </div>
       </div>
+
+      <div class="action-bar" style="flex-wrap:wrap;gap:12px;">
+        <label for="sub-from">From:</label>
+        <input type="date" id="sub-from" value="2026-06-01" />
+        <label for="sub-to">To:</label>
+        <input type="date" id="sub-to" value="2026-06-07" />
+      </div>
+
       <div class="subscription-section">
         <strong>Markets</strong>
-        <label><input type="checkbox" name="market" value="Copper"> Copper</label>
-        <label><input type="checkbox" name="market" value="Gold"> Gold</label>
-        <label><input type="checkbox" name="market" value="Silver"> Silver</label>
-        <label><input type="checkbox" name="market" value="Aluminum"> Aluminum</label>
+        <div class="market-checkboxes" style="margin-top:8px;">
+          <label class="market-check"><input type="checkbox" name="sub-market" value="copper" checked /> 🟤 Copper</label>
+          <label class="market-check"><input type="checkbox" name="sub-market" value="gold" checked /> 🟡 Gold</label>
+          <label class="market-check"><input type="checkbox" name="sub-market" value="silver" checked /> ⚪ Silver</label>
+          <label class="market-check"><input type="checkbox" name="sub-market" value="oil" checked /> 🛢️ Oil</label>
+        </div>
       </div>
+
       <div class="subscription-section">
-        <strong>Report Types</strong>
-        <label><input type="checkbox" name="item" value="Daily Report"> Daily Report</label>
-        <label><input type="checkbox" name="item" value="Sentiment Alert"> Sentiment Alert</label>
-        <label><input type="checkbox" name="item" value="Price Alert"> Price Alert</label>
+        <strong>Audience</strong>
+        <select id="sub-audience" style="margin-top:8px;max-width:320px;">
+          <option value="Global Metals Corp">Global Metals Corp</option>
+          <option value="Pacific Resources Ltd">Pacific Resources Ltd</option>
+          <option value="Atlantic Mining Group">Atlantic Mining Group</option>
+          <option value="Continental Steel Partners">Continental Steel Partners</option>
+          <option value="Meridian Commodities Inc">Meridian Commodities Inc</option>
+        </select>
       </div>
+
       <div class="action-bar">
-        <button class="action" id="subscription-save">💾 Save Preferences</button>
+        <button class="action" id="subscription-generate">✦ Generate</button>
+        <span id="sub-spinner" class="spinner" hidden></span>
       </div>
-      <pre id="result" class="ready-state">Ready — adjust preferences and click Save.</pre>
+      <div id="sub-status"></div>
     </div>
+
+    <!-- Insight Reports Viewer (formerly Insight Delivery) -->
+    <div class="panel" style="margin-top:20px;">
+      <div class="panel-header">
+        <div>
+          <h2 class="panel-title">Insight Reports</h2>
+          <p class="panel-desc">Browse previously generated market insight reports.</p>
+        </div>
+        <div id="delivery-controls">
+          <label>Previous Reports:
+            <select id="delivery-select"><option value="">Latest</option></select>
+          </label>
+          <span id="delivery-date" style="font-size:12px;color:var(--color-text-muted);margin-left:8px;"></span>
+        </div>
+      </div>
+      <article id="delivery-content" class="markdown">Loading…</article>
+    </div>
+
+    <!-- Generated PDF Reports -->
+    <div id="sub-pdf-section" style="margin-top:20px;display:none;">
+      <div id="sub-pdf-reports"></div>
+    </div>
+
   </main>
   <script src="/common.js"></script>
   <script src="/subscription.js"></script>

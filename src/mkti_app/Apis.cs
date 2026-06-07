@@ -17,6 +17,7 @@ public static class Apis
         NewsAnalysisAgent newsAnalysisAgent,
         MarketResearchAgent marketResearchAgent,
         InsightGenerationAgent insightGenerationAgent,
+        SubscriptionAgent subscriptionAgent,
         BlobStorageService blobStorageService,
         FabricLakehouseService fabricLakehouseService)
     {
@@ -259,20 +260,55 @@ public static class Apis
             if (selectedMarkets.Length == 0) selectedMarkets = allMarkets;
 
             var today = DateTime.UtcNow.Date;
-            var fromStr = !string.IsNullOrWhiteSpace(from) ? from : today.ToString("yyyy-MM-dd");
-            var toStr   = !string.IsNullOrWhiteSpace(to)   ? to   : today.ToString("yyyy-MM-dd");
-            var marketsList = string.Join(", ", selectedMarkets);
-            await insightGenerationAgent.RunAsync($"Generate a market insight report for the following markets: {marketsList}. Date range: {fromStr} to {toStr}. Only include analysis for these markets: {marketsList}. Store the result in markdown.");
-            var latest = await ReadLatestInsightAsync(blobStorageService);
-            var preview = latest.Content.Length > InsightPreviewMaxLength
-                ? latest.Content[..InsightPreviewMaxLength]
-                : latest.Content;
+            // Default: current week end + 6 weeks lookback
+            var daysFromMonday = ((int)today.DayOfWeek + 6) % 7;
+            var weekEnd = today.AddDays(6 - daysFromMonday);
+            var weekStart = weekEnd.AddDays(-41); // ~6 weeks back
+            var fromStr = !string.IsNullOrWhiteSpace(from) ? from : weekStart.ToString("yyyy-MM-dd");
+            var toStr   = !string.IsNullOrWhiteSpace(to)   ? to   : weekEnd.ToString("yyyy-MM-dd");
+            var todayStr = today.ToString("yyyy-MM-dd");
+
+            var results = new List<object>();
+            foreach (var market in selectedMarkets)
+            {
+                var message =
+                    $"Generate a professional market insight report for the {market} market. " +
+                    $"Focus ONLY on the {market} market. " +
+                    $"Use list_market_research_history with market='{market}' to retrieve all historical weekly snapshots (look back as many weeks as available, at least 6 weeks). " +
+                    $"Date range for context: {fromStr} to {toStr}. " +
+                    $"Store the result by calling store_market_insight_for_market with market='{market}' and date='{todayStr}'.";
+
+                await insightGenerationAgent.RunAsync(message);
+
+                // Read back the stored insight for this market
+                var filename = $"{todayStr}_{market}_insight.md";
+                var content = await blobStorageService.ReadTextAsync("market-insight", filename) ?? string.Empty;
+                if (string.IsNullOrEmpty(content))
+                {
+                    // Fallback: find any recently stored file for this market
+                    var names = await blobStorageService.ListBlobNamesAsync("market-insight");
+                    var match = names.OrderByDescending(n => n, StringComparer.Ordinal)
+                        .FirstOrDefault(n => n.Contains($"_{market}_insight", StringComparison.OrdinalIgnoreCase));
+                    if (match is not null)
+                    {
+                        filename = match;
+                        content = await blobStorageService.ReadTextAsync("market-insight", match) ?? string.Empty;
+                    }
+                }
+
+                var preview = content.Length > InsightPreviewMaxLength
+                    ? content[..InsightPreviewMaxLength]
+                    : content;
+
+                results.Add(new { market, date = todayStr, filename, preview });
+            }
+
             return Results.Json(new
             {
-                success = true,
-                date = latest.Date,
-                filename = latest.Filename,
-                preview
+                status = "ok",
+                weekStart = fromStr,
+                weekEnd = toStr,
+                markets = results
             });
         });
 
@@ -320,6 +356,88 @@ public static class Apis
             var userId = ResolveUserId(context);
             await blobStorageService.WriteTextAsync("subscriptions", $"{userId}.json", request.ToJson());
             return Results.Json(new { success = true });
+        });
+
+        app.MapPost("/api/subscription/generate", async (SubscriptionGenerateRequest request) =>
+        {
+            var allMarkets = new[] { "copper", "gold", "silver", "oil" };
+            var selectedMarkets = (request.Markets ?? [])
+                .Select(m => m.Trim().ToLowerInvariant())
+                .Where(m => allMarkets.Contains(m))
+                .Distinct()
+                .ToArray();
+            if (selectedMarkets.Length == 0) selectedMarkets = ["copper"];
+
+            var audience = string.IsNullOrWhiteSpace(request.Audience) ? "Client" : request.Audience.Trim();
+            var fromDate = request.From ?? DateTime.UtcNow.AddDays(-7).ToString("yyyy-MM-dd");
+            var toDate   = request.To   ?? DateTime.UtcNow.ToString("yyyy-MM-dd");
+
+            var results = new List<object>();
+            foreach (var market in selectedMarkets)
+            {
+                var message =
+                    $"Generate a subscription report for the {market} market for customer '{audience}'. " +
+                    $"Date range: {fromDate} to {toDate}. " +
+                    $"Use read_market_insight_for_market with market='{market}' to get the insight, " +
+                    $"then call generate_subscription_report with market='{market}', audience='{audience}', " +
+                    $"fromDate='{fromDate}', toDate='{toDate}', and the retrieved insight markdown. " +
+                    $"Return the filename from generate_subscription_report.";
+
+                var agentResult = await subscriptionAgent.RunAsync(message);
+
+                // Try to parse the filename from the agent result
+                string? filename = null;
+                string? htmlBase64 = null;
+                try
+                {
+                    using var doc = System.Text.Json.JsonDocument.Parse(agentResult);
+                    var root = doc.RootElement;
+                    if (root.TryGetProperty("filename", out var fn)) filename = fn.GetString();
+                    if (root.TryGetProperty("htmlBase64", out var hb)) htmlBase64 = hb.GetString();
+                }
+                catch
+                {
+                    // Try to extract filename from free-text
+                    var fnMatch = System.Text.RegularExpressions.Regex.Match(agentResult, @"\d{4}-\d{2}-\d{2}_\w+_[\w-]+_report\.html");
+                    if (fnMatch.Success) filename = fnMatch.Value;
+                }
+
+                // If agent did not produce base64, read the stored HTML from blob
+                if (string.IsNullOrEmpty(htmlBase64) && !string.IsNullOrEmpty(filename))
+                {
+                    var htmlContent = await blobStorageService.ReadTextAsync("market-subscription", filename);
+                    if (!string.IsNullOrEmpty(htmlContent))
+                        htmlBase64 = Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes(htmlContent));
+                }
+
+                results.Add(new
+                {
+                    market,
+                    audience,
+                    filename = filename ?? string.Empty,
+                    reportUrl = string.IsNullOrEmpty(filename) ? string.Empty : $"/api/subscription/report/{Uri.EscapeDataString(filename)}",
+                    htmlBase64 = htmlBase64 ?? string.Empty
+                });
+            }
+
+            return Results.Json(new { status = "ok", reports = results });
+        });
+
+        app.MapGet("/api/subscription/report/{filename}", async (string filename) =>
+        {
+            if (string.IsNullOrWhiteSpace(filename))
+                return Results.BadRequest("filename is required");
+
+            // Prevent path traversal
+            var safeName = Path.GetFileName(filename);
+            if (string.IsNullOrEmpty(safeName) || safeName != filename)
+                return Results.BadRequest("Invalid filename");
+
+            var content = await blobStorageService.ReadTextAsync("market-subscription", safeName);
+            if (content is null)
+                return Results.NotFound();
+
+            return Results.Content(content, "text/html; charset=utf-8");
         });
     }
 

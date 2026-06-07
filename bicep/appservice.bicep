@@ -19,8 +19,8 @@ param storageAccountName string
 @description('Azure AI project endpoint')
 param aiProjectEndpoint string
 
-@description('Primary AI model deployment name')
-param primaryModelDeploymentName string
+@description('AI model deployment name')
+param modelDeploymentName string
 
 @description('Azure Document Intelligence endpoint')
 param docIntelligenceEndpoint string = ''
@@ -81,7 +81,7 @@ resource webApp 'Microsoft.Web/sites@2023-12-01' = {
         }
         {
           name: 'AZURE_AI_MODEL_DEPLOYMENT_NAME'
-          value: primaryModelDeploymentName
+          value: modelDeploymentName
         }
         {
           name: 'AZURE_TENANT_ID'

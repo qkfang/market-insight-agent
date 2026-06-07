@@ -3,7 +3,7 @@ using 'main.bicep'
 param baseName = 'mkti'
 param projectName = 'market_insight'
 param location = 'westus3'
-param primaryModelDeploymentName = 'gpt-4.1'
+param modelDeploymentName = 'gpt-5.4'
 param principals = [
   {
     id: '4b74544b-02c6-4e4f-b936-732c9c3fff65'

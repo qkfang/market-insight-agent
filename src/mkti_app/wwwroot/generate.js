@@ -2,26 +2,50 @@ const btn = document.getElementById('generate-btn');
 const spinner = document.getElementById('generate-spinner');
 const fromInput = document.getElementById('generate-from');
 const toInput = document.getElementById('generate-to');
-const summary = document.getElementById('generate-summary');
-const preview = document.getElementById('generate-preview');
-const link = document.getElementById('generate-link');
+const resultEl = document.getElementById('generate-result');
+
+const marketIcons = { copper: '🟤', gold: '🟡', silver: '⚪', oil: '🛢️' };
 
 function getCheckedMarkets() {
   return Array.from(document.querySelectorAll('input[name="gen-market"]:checked')).map(cb => cb.value);
 }
 
+function renderInsightCard(m) {
+  const icon = marketIcons[m.market] || '📊';
+  const previewText = (m.preview || '').replace(/^#+\s.*/gm, '').replace(/\*\*/g, '').trim();
+  const shortPreview = previewText.length > 400 ? previewText.slice(0, 400) + '…' : previewText;
+  const filenameLabel = m.filename ? `<span class="status-badge success" style="font-size:11px;">${escapeHtml(m.filename)}</span>` : '';
+  return `
+    <div class="research-card">
+      <div class="research-card-header">
+        <span class="research-market-name">${icon} ${escapeHtml((m.market || '').toUpperCase())}</span>
+        <div style="display:flex;align-items:center;gap:8px;">
+          ${filenameLabel}
+          <a class="action" style="padding:4px 12px;font-size:12px;" href="/delivery.html">→ Full Report</a>
+        </div>
+      </div>
+      <div class="research-summary" style="white-space:pre-wrap;font-size:13px;margin-top:10px;">${escapeHtml(shortPreview)}</div>
+    </div>`;
+}
+
+function renderResult(data) {
+  const markets = Array.isArray(data.markets) ? data.markets : [];
+  if (markets.length === 0) {
+    resultEl.innerHTML = '<p class="research-error">No results returned.</p>';
+    return;
+  }
+  resultEl.innerHTML = `<div class="research-cards-grid">${markets.map(renderInsightCard).join('')}</div>`;
+}
+
 btn.onclick = async () => {
   const selected = getCheckedMarkets();
   if (selected.length === 0) {
-    summary.innerHTML = '<span class="status-badge error">Please select at least one market.</span>';
+    resultEl.innerHTML = '<p class="research-error">Please select at least one market.</p>';
     return;
   }
   btn.disabled = true;
   spinner.hidden = false;
-  summary.innerHTML = '';
-  link.innerHTML = '';
-  preview.textContent = 'Generating insight report... this may take 30–60 seconds.';
-  preview.className = '';
+  resultEl.innerHTML = `<p style="color:var(--color-text-muted);font-size:13px;">Generating insight reports… this may take 30–90 seconds per market.</p>`;
   try {
     const params = new URLSearchParams();
     if (fromInput.value) params.set('from', fromInput.value);
@@ -30,17 +54,10 @@ btn.onclick = async () => {
     const response = await fetch(`/api/insight/generate?${params}`);
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
     const json = await response.json();
-    if (!json.success) throw new Error(json.error || 'Generation failed.');
-    summary.innerHTML = `<span class="status-badge success">✓ Stored as ${escapeHtml(json.filename || '')} &mdash; ${escapeHtml(json.date || '')}</span>`;
-    preview.textContent = json.preview || '(empty report)';
-    const fullLink = document.createElement('a');
-    fullLink.className = 'action';
-    fullLink.textContent = '→ View Full Report';
-    fullLink.href = '/delivery.html';
-    link.appendChild(fullLink);
+    if (json.status === 'error') throw new Error(json.error || 'Generation failed.');
+    renderResult(json);
   } catch (e) {
-    summary.innerHTML = `<span class="status-badge error">Error: ${escapeHtml(e.message)}</span>`;
-    preview.textContent = `Error: ${e.message}`;
+    resultEl.innerHTML = `<p class="research-error">Error: ${escapeHtml(e.message)}</p>`;
   } finally {
     btn.disabled = false;
     spinner.hidden = true;

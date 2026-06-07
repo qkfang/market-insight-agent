@@ -39,7 +39,7 @@ builder.Services.AddHttpClient();
 builder.Services.AddCors();
 
 var projectEndpoint = builder.Configuration["AZURE_AI_PROJECT_ENDPOINT"] ?? "https://example.invalid";
-var deploymentName = builder.Configuration["AZURE_AI_MODEL_DEPLOYMENT_NAME"] ?? "gpt-4.1-mini";
+var deploymentName = builder.Configuration["AZURE_AI_MODEL_DEPLOYMENT_NAME"] ?? "gpt-5.4";
 var appMcpUrl = builder.Configuration["APP_MCP_URL"] ?? "http://localhost:5001";
 var storageAccountName = builder.Configuration["AZURE_STORAGE_ACCOUNT_NAME"] is { Length: > 0 } sa ? sa : "devstoreaccount1";
 var docIntelligenceEndpoint = builder.Configuration["AZURE_DOC_INTELLIGENCE_ENDPOINT"] ?? string.Empty;
@@ -134,6 +134,7 @@ var newsIngestionAgent = new NewsIngestionAgent(aiProjectClient, deploymentName,
 var newsAnalysisAgent = new NewsAnalysisAgent(aiProjectClient, deploymentName, [appMcpTool], loggerFactory.CreateLogger<NewsAnalysisAgent>());
 var marketResearchAgent = new MarketResearchAgent(aiProjectClient, deploymentName, marketResearchTools, loggerFactory.CreateLogger<MarketResearchAgent>());
 var insightGenerationAgent = new InsightGenerationAgent(aiProjectClient, deploymentName, [appMcpTool], loggerFactory.CreateLogger<InsightGenerationAgent>());
+var subscriptionAgent = new SubscriptionAgent(aiProjectClient, deploymentName, [appMcpTool], loggerFactory.CreateLogger<SubscriptionAgent>());
 
 var blobStorageService = app.Services.GetRequiredService<BlobStorageService>();
 var fabricLakehouseService = app.Services.GetRequiredService<FabricLakehouseService>();
@@ -143,6 +144,7 @@ app.MapAllEndpoints(
     newsAnalysisAgent,
     marketResearchAgent,
     insightGenerationAgent,
+    subscriptionAgent,
     blobStorageService,
     fabricLakehouseService);
 

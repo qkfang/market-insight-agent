@@ -12,11 +12,8 @@ param projectName string = 'market_insight'
 var skuName = 'S1'
 var fabricSkuName = 'F2'
 
-@description('Primary AI model deployment name')
-param primaryModelDeploymentName string = 'gpt-4.1'
-
-@description('Secondary AI model deployment name')
-param secondaryModelDeploymentName string = 'gpt-4.1-mini'
+@description('AI model deployment name')
+param modelDeploymentName string = 'gpt-5.4'
 
 @description('Additional principals to grant Storage Blob Data Contributor on the storage account')
 param principals array = []
@@ -69,8 +66,7 @@ module foundry 'foundry.bicep' = {
     location: location
     aiServicesName: aiServicesName
     aiProjectName: aiProjectName
-    primaryModelDeploymentName: primaryModelDeploymentName
-    secondaryModelDeploymentName: secondaryModelDeploymentName
+    modelDeploymentName: modelDeploymentName
   }
 }
 
@@ -101,7 +97,7 @@ module appService 'appservice.bicep' = {
     appInsightsConnectionString: monitoring.outputs.appInsightsConnectionString
     storageAccountName: storageAccountName
     aiProjectEndpoint: foundry.outputs.aiProjectEndpoint
-    primaryModelDeploymentName: foundry.outputs.primaryModelDeploymentName
+    modelDeploymentName: foundry.outputs.modelDeploymentName
     docIntelligenceEndpoint: foundry.outputs.aiServicesEndpoint
     fabricLakehouseWorkspaceId: fabricLakehouseWorkspaceId
     fabricLakehouseId: fabricLakehouseId
@@ -163,5 +159,5 @@ output webAppUrl string = appService.outputs.webAppUrl
 output storageAccountName string = storage.outputs.storageAccountName
 output appInsightsConnectionString string = monitoring.outputs.appInsightsConnectionString
 output azureAiProjectEndpoint string = foundry.outputs.aiProjectEndpoint
-output azureAiModelDeploymentName string = foundry.outputs.primaryModelDeploymentName
+output azureAiModelDeploymentName string = foundry.outputs.modelDeploymentName
 output fabricCapacityName string = fabric.outputs.fabricCapacityName

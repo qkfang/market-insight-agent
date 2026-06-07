@@ -31,20 +31,13 @@
     <a href="/research.html">Market Research</a>
     <a href="/generate.html" class="active">Insight Generation</a>
     <a href="/subscription.html">Subscription</a>
-    <a href="/delivery.html">Insight Delivery</a>
   </nav>
   <main class="app-main">
     <div class="panel">
       <div class="panel-header">
         <div>
-          <h2 class="panel-title">Insight Generation <span class="agent-hint"><a href="#">Agent Instructions</a><div class="agent-popup">You are a market insight report writer. First call get_latest_research and read_news_analysis (or list_news_analysis) to gather the copper market sentiment research and latest news analysis.
-
-Using that information, produce a professional daily market insight report in markdown format.
-
-Include these sections: Executive Summary, Market Sentiment, Key Price Drivers, Risk Factors, Outlook, and Sources.
-
-Store the result with today's date by calling the store_market_insight MCP tool, passing today's date (yyyy-MM-dd) and the markdown content.</div></span></h2>
-          <p class="panel-desc">Generate a copper market insight report for the selected markets. This may take 30–60 seconds.</p>
+          <h2 class="panel-title">Insight Generation <span class="agent-hint"><a href="#">Agent Instructions</a><div class="agent-popup">You are a market insight report writer. When a specific market is requested, focus exclusively on that market. Use list_market_research_history (with the market filter) to retrieve all historical weekly research snapshots — look back at least 6 weeks. Use read_news_analysis to gather the latest news. Produce a professional markdown report with: Executive Summary, Current Market Sentiment, Key Price Drivers, Risk Factors, Market View Timeline, Outlook, and Sources. Store the result by calling store_market_insight_for_market with the market name and today's date.</div></span></h2>
+          <p class="panel-desc">Generate per-market insight reports backed by multi-week research history. This may take 30–90 seconds per market.</p>
         </div>
       </div>
       <div class="action-bar">
@@ -61,10 +54,7 @@ Store the result with today's date by calling the store_market_insight MCP tool,
         <button class="action" id="generate-btn">✦ Generate Insight</button>
         <span id="generate-spinner" class="spinner" hidden></span>
       </div>
-      <div id="generate-summary"></div>
-      <div class="section-heading">Report Preview</div>
-      <pre id="generate-preview" class="ready-state">No report generated yet.</pre>
-      <div id="generate-link"></div>
+      <div id="generate-result"></div>
     </div>
   </main>
   <script src="/common.js"></script>

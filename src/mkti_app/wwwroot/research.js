@@ -4,9 +4,9 @@ const resultEl = document.getElementById('research-result');
 const pre = document.getElementById('result');
 
 const badges = {
-  bullish: { cls: 'bullish', icon: '🟢', label: 'Bullish' },
-  bearish: { cls: 'bearish', icon: '🔴', label: 'Bearish' },
-  neutral: { cls: 'neutral', icon: '🟡', label: 'Neutral' }
+  bullish: { cls: 'bullish', icon: '▲', label: 'Bullish' },
+  bearish: { cls: 'bearish', icon: '▼', label: 'Bearish' },
+  neutral: { cls: 'neutral', icon: '◆', label: 'Neutral' }
 };
 
 function renderResult(data) {
@@ -17,18 +17,26 @@ function renderResult(data) {
   const driversHtml = drivers.length
     ? `<ul>${drivers.map(d => `<li>${escapeHtml(d)}</li>`).join('')}</ul>`
     : '<p>No key drivers identified.</p>';
+  const timestamp = data.timestamp
+    ? `<span class="research-timestamp">Generated: ${new Date(data.timestamp).toLocaleString()}</span>`
+    : '';
 
   resultEl.innerHTML = `
-    <div class="sentiment-badge ${badge.cls}">
-      <span class="sentiment-icon">${badge.icon}</span>
-      <span class="sentiment-label">${badge.label}</span>
-      <span class="sentiment-confidence">${confidencePct}% confidence</span>
-    </div>
-    <h3>Key Drivers</h3>
-    ${driversHtml}
-    <h3>Research Summary</h3>
-    <p class="research-summary">${escapeHtml(data.summary || '')}</p>
-    ${data.timestamp ? `<p class="research-timestamp"><em>Generated: ${new Date(data.timestamp).toLocaleString()}</em></p>` : ''}`;
+    <div class="research-card">
+      <div class="research-card-header">
+        <div class="sentiment-badge ${badge.cls}">
+          <span class="sentiment-icon">${badge.icon}</span>
+          <span class="sentiment-label">${badge.label}</span>
+          <span class="sentiment-confidence">${confidencePct}% confidence</span>
+        </div>
+        ${timestamp}
+      </div>
+      <div class="research-key-drivers">
+        <h4>Key Drivers</h4>
+        ${driversHtml}
+      </div>
+      <div class="research-summary">${escapeHtml(data.summary || '')}</div>
+    </div>`;
 }
 
 btn.onclick = async () => {

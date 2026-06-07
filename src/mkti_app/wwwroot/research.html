@@ -4,11 +4,26 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Market Research - Market Insight Agent</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="/style.css" />
 </head>
 <body>
-  <h1>Market Insight Agent</h1>
-  <nav class="tabs">
+  <header class="app-header">
+    <a class="app-header-logo" href="/index.html">
+      <div class="app-header-icon">📈</div>
+      <div>
+        <div class="app-header-title">Market Insight Agent</div>
+        <div class="app-header-subtitle">Copper Market Intelligence</div>
+      </div>
+    </a>
+    <div class="app-header-divider"></div>
+    <div class="app-header-meta">
+      <span class="app-header-badge"><span class="status-dot"></span> System Online</span>
+    </div>
+  </header>
+  <nav class="app-nav">
     <a href="/index.html">Overview</a>
     <a href="/knowledge.html">Knowledge</a>
     <a href="/ingest.html">News Ingestion</a>
@@ -18,19 +33,27 @@
     <a href="/subscription.html">Subscription</a>
     <a href="/delivery.html">Insight Delivery</a>
   </nav>
-  <section id="content" class="panel">
-    <h2>Market Research <span class="agent-hint"><a href="#">Agent Instructions</a><div class="agent-popup">You are a copper market research analyst. Read the latest news analysis documents (read_latest_news_analysis), search Bing for current copper price and market news (bing_search_copper_market), then query the Fabric data agent for historical trends.
+  <main class="app-main">
+    <div class="panel">
+      <div class="panel-header">
+        <div>
+          <h2 class="panel-title">Market Research <span class="agent-hint"><a href="#">Agent Instructions</a><div class="agent-popup">You are a copper market research analyst. Read the latest news analysis documents (read_latest_news_analysis), search Bing for current copper price and market news (bing_search_copper_market), then query the Fabric data agent for historical trends.
 
 Produce a structured sentiment assessment: bullish/bearish/neutral with a confidence score and key drivers.
 
 Respond with ONLY a single JSON object (no markdown fences) using exactly these fields:
 { "sentiment": "bullish|bearish|neutral", "confidence": 0.0-1.0, "keyDrivers": ["..."], "summary": "..." }</div></span></h2>
-    <p>Research current copper market sentiment from the latest news analysis, Bing search, and the Fabric data agent. This may take 30-60 seconds.</p>
-    <button class="action" id="research-btn">Research Market</button>
-    <span id="research-spinner" class="spinner" hidden></span>
-    <div id="research-result"></div>
-    <pre id="result" hidden></pre>
-  </section>
+          <p class="panel-desc">Research current copper market sentiment from the latest news analysis, Bing search, and the Fabric data agent. This may take 30–60 seconds.</p>
+        </div>
+      </div>
+      <div class="action-bar">
+        <button class="action" id="research-btn">📊 Research Market</button>
+        <span id="research-spinner" class="spinner" hidden></span>
+      </div>
+      <div id="research-result"></div>
+      <pre id="result" hidden></pre>
+    </div>
+  </main>
   <script src="/common.js"></script>
   <script src="/research.js"></script>
 </body>

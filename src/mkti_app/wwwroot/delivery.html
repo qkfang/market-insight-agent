@@ -4,11 +4,26 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Insight Delivery - Market Insight Agent</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="/style.css" />
 </head>
 <body>
-  <h1>Market Insight Agent</h1>
-  <nav class="tabs">
+  <header class="app-header">
+    <a class="app-header-logo" href="/index.html">
+      <div class="app-header-icon">📈</div>
+      <div>
+        <div class="app-header-title">Market Insight Agent</div>
+        <div class="app-header-subtitle">Copper Market Intelligence</div>
+      </div>
+    </a>
+    <div class="app-header-divider"></div>
+    <div class="app-header-meta">
+      <span class="app-header-badge"><span class="status-dot"></span> System Online</span>
+    </div>
+  </header>
+  <nav class="app-nav">
     <a href="/index.html">Overview</a>
     <a href="/knowledge.html">Knowledge</a>
     <a href="/ingest.html">News Ingestion</a>
@@ -18,16 +33,23 @@
     <a href="/subscription.html">Subscription</a>
     <a href="/delivery.html" class="active">Insight Delivery</a>
   </nav>
-  <section id="content" class="panel">
-    <h2>Insight Delivery</h2>
-    <div id="delivery-controls">
-      <label>Previous Reports:
-        <select id="delivery-select"><option value="">Latest</option></select>
-      </label>
-      <span id="delivery-date"></span>
+  <main class="app-main">
+    <div class="panel">
+      <div class="panel-header">
+        <div>
+          <h2 class="panel-title">Insight Delivery</h2>
+          <p class="panel-desc">Browse and read the latest generated copper market insight reports.</p>
+        </div>
+        <div id="delivery-controls">
+          <label>Previous Reports:
+            <select id="delivery-select"><option value="">Latest</option></select>
+          </label>
+          <span id="delivery-date"></span>
+        </div>
+      </div>
+      <article id="delivery-content" class="markdown">Loading...</article>
     </div>
-    <article id="delivery-content" class="markdown">Loading...</article>
-  </section>
+  </main>
   <script src="/common.js"></script>
   <script src="/delivery.js"></script>
 </body>

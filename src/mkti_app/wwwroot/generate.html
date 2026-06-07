@@ -4,11 +4,26 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Insight Generation - Market Insight Agent</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="/style.css" />
 </head>
 <body>
-  <h1>Market Insight Agent</h1>
-  <nav class="tabs">
+  <header class="app-header">
+    <a class="app-header-logo" href="/index.html">
+      <div class="app-header-icon">📈</div>
+      <div>
+        <div class="app-header-title">Market Insight Agent</div>
+        <div class="app-header-subtitle">Copper Market Intelligence</div>
+      </div>
+    </a>
+    <div class="app-header-divider"></div>
+    <div class="app-header-meta">
+      <span class="app-header-badge"><span class="status-dot"></span> System Online</span>
+    </div>
+  </header>
+  <nav class="app-nav">
     <a href="/index.html">Overview</a>
     <a href="/knowledge.html">Knowledge</a>
     <a href="/ingest.html">News Ingestion</a>
@@ -18,22 +33,30 @@
     <a href="/subscription.html">Subscription</a>
     <a href="/delivery.html">Insight Delivery</a>
   </nav>
-  <section id="content" class="panel">
-    <h2>Insight Generation <span class="agent-hint"><a href="#">Agent Instructions</a><div class="agent-popup">You are a market insight report writer. First call get_latest_research and read_news_analysis (or list_news_analysis) to gather the copper market sentiment research and latest news analysis.
+  <main class="app-main">
+    <div class="panel">
+      <div class="panel-header">
+        <div>
+          <h2 class="panel-title">Insight Generation <span class="agent-hint"><a href="#">Agent Instructions</a><div class="agent-popup">You are a market insight report writer. First call get_latest_research and read_news_analysis (or list_news_analysis) to gather the copper market sentiment research and latest news analysis.
 
 Using that information, produce a professional daily market insight report in markdown format.
 
 Include these sections: Executive Summary, Market Sentiment, Key Price Drivers, Risk Factors, Outlook, and Sources.
 
 Store the result with today's date by calling the store_market_insight MCP tool, passing today's date (yyyy-MM-dd) and the markdown content.</div></span></h2>
-    <p>Generate today's copper market insight report. This may take 30-60 seconds.</p>
-    <button class="action" id="generate-btn">Generate Today's Insight</button>
-    <span id="generate-spinner" class="spinner" hidden></span>
-    <div id="generate-summary"></div>
-    <h3>Preview</h3>
-    <pre id="generate-preview">No report generated yet.</pre>
-    <div id="generate-link"></div>
-  </section>
+          <p class="panel-desc">Generate today's copper market insight report. This may take 30–60 seconds.</p>
+        </div>
+      </div>
+      <div class="action-bar">
+        <button class="action" id="generate-btn">✦ Generate Today's Insight</button>
+        <span id="generate-spinner" class="spinner" hidden></span>
+      </div>
+      <div id="generate-summary"></div>
+      <div class="section-heading">Report Preview</div>
+      <pre id="generate-preview" class="ready-state">No report generated yet.</pre>
+      <div id="generate-link"></div>
+    </div>
+  </main>
   <script src="/common.js"></script>
   <script src="/generate.js"></script>
 </body>

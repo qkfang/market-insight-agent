@@ -50,13 +50,13 @@ When calling store_news_article, provide a concise kebab-case description of the
         <label for="ingest-to">To:</label>
         <input type="date" id="ingest-to" value="2026-06-07" />
         <button class="action" id="ingest-btn">⬇ Ingest Now</button>
+        <button class="action" id="ingest-refresh-btn">↻ Refresh List</button>
         <span id="ingest-spinner" class="spinner" hidden></span>
       </div>
       <div id="ingest-meta"></div>
       <div id="ingest-summary"></div>
       <div class="section-heading" style="display:flex;align-items:center;gap:10px;">
         Stored Articles
-        <button class="action" id="ingest-refresh-btn" style="padding:2px 10px;font-size:12px;">↻ Refresh List</button>
         <span id="ingest-cache-time" style="font-size:11px;color:var(--color-text-muted);"></span>
       </div>
       <ul id="ingest-files"><li>Loading from cache…</li></ul>

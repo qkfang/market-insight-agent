@@ -109,6 +109,27 @@ app.Use(async (context, next) =>
 app.UseDefaultFiles();
 app.UseStaticFiles();
 
+// Pre-create empty cache files so page loads don't get a 404 on first visit
+{
+    var webRoot = app.Environment.WebRootPath
+        ?? Path.Combine(app.Environment.ContentRootPath, "wwwroot");
+    var tempDir = Path.Combine(webRoot, "temp");
+    Directory.CreateDirectory(tempDir);
+    var emptyCaches = new Dictionary<string, string>
+    {
+        ["cache-ingest.json"]   = """{"filenames":[]}""",
+        ["cache-analyze.json"]  = """{"articles":[],"cachedAt":null}""",
+        ["cache-research.json"] = """{"reports":[],"cachedAt":null}""",
+        ["cache-generate.json"] = """{"reports":[],"cachedAt":null}""",
+    };
+    foreach (var (name, content) in emptyCaches)
+    {
+        var path = Path.Combine(tempDir, name);
+        if (!File.Exists(path))
+            File.WriteAllText(path, content, System.Text.Encoding.UTF8);
+    }
+}
+
 app.MapMcp("/mcp");
 app.MapHealthChecks("/health");
 app.MapGet("/", () => Results.Redirect("/index.html"));

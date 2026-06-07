@@ -1075,62 +1075,62 @@ public sealed class MarketInsightMcpTools
 
         var htmlBody = MarkdownToHtml(markdown);
 
-        return $"""
+        return $$"""
 <!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>{EscapeAttr(market.ToUpperInvariant())} Market Intelligence — {EscapeAttr(audience)}</title>
+<title>{{EscapeAttr(market.ToUpperInvariant())}} Market Intelligence — {{EscapeAttr(audience)}}</title>
 <style>
-  *, *::before, *::after {{ box-sizing: border-box; margin: 0; padding: 0; }}
-  @page {{ size: A4; margin: 20mm 15mm; }}
-  body {{ font-family: 'Segoe UI', 'Helvetica Neue', Arial, sans-serif; font-size: 13px; line-height: 1.65; color: #1e293b; background: #f8fafc; }}
-  .page {{ max-width: 860px; margin: 0 auto; background: #fff; box-shadow: 0 4px 24px rgba(0,0,0,0.08); }}
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  @page { size: A4; margin: 20mm 15mm; }
+  body { font-family: 'Segoe UI', 'Helvetica Neue', Arial, sans-serif; font-size: 13px; line-height: 1.65; color: #1e293b; background: #f8fafc; }
+  .page { max-width: 860px; margin: 0 auto; background: #fff; box-shadow: 0 4px 24px rgba(0,0,0,0.08); }
   /* Header */
-  .rpt-header {{ display: flex; align-items: center; justify-content: space-between; padding: 24px 36px; background: #0d1b2e; color: #fff; }}
-  .rpt-header-left {{ display: flex; align-items: center; gap: 14px; }}
-  .rpt-logo-icon {{ width: 44px; height: 44px; border-radius: 10px; background: rgba(255,255,255,0.12); display: flex; align-items: center; justify-content: center; font-size: 22px; }}
-  .rpt-brand {{ color: #fff; }}
-  .rpt-brand-name {{ font-size: 16px; font-weight: 700; letter-spacing: -0.3px; }}
-  .rpt-brand-sub {{ font-size: 11px; color: #93c5fd; margin-top: 2px; }}
-  .rpt-header-right {{ text-align: right; }}
-  .rpt-gen-date {{ font-size: 11px; color: #93c5fd; }}
-  .rpt-period {{ font-size: 12px; color: #e2e8f0; margin-top: 4px; font-weight: 500; }}
+  .rpt-header { display: flex; align-items: center; justify-content: space-between; padding: 24px 36px; background: #0d1b2e; color: #fff; }
+  .rpt-header-left { display: flex; align-items: center; gap: 14px; }
+  .rpt-logo-icon { width: 44px; height: 44px; border-radius: 10px; background: rgba(255,255,255,0.12); display: flex; align-items: center; justify-content: center; font-size: 22px; }
+  .rpt-brand { color: #fff; }
+  .rpt-brand-name { font-size: 16px; font-weight: 700; letter-spacing: -0.3px; }
+  .rpt-brand-sub { font-size: 11px; color: #93c5fd; margin-top: 2px; }
+  .rpt-header-right { text-align: right; }
+  .rpt-gen-date { font-size: 11px; color: #93c5fd; }
+  .rpt-period { font-size: 12px; color: #e2e8f0; margin-top: 4px; font-weight: 500; }
   /* Market Banner */
-  .rpt-banner {{ background: linear-gradient(135deg, {EscapeAttr(color)} 0%, {EscapeAttr(gradientEnd)} 100%); padding: 20px 36px; display: flex; align-items: center; justify-content: space-between; }}
-  .rpt-market-title {{ font-size: 22px; font-weight: 700; color: #fff; display: flex; align-items: center; gap: 10px; letter-spacing: -0.5px; }}
-  .rpt-market-badge {{ background: rgba(255,255,255,0.18); border: 1px solid rgba(255,255,255,0.3); border-radius: 20px; padding: 3px 12px; font-size: 11px; color: #fff; font-weight: 600; letter-spacing: 1px; text-transform: uppercase; }}
+  .rpt-banner { background: linear-gradient(135deg, {{EscapeAttr(color)}} 0%, {{EscapeAttr(gradientEnd)}} 100%); padding: 20px 36px; display: flex; align-items: center; justify-content: space-between; }
+  .rpt-market-title { font-size: 22px; font-weight: 700; color: #fff; display: flex; align-items: center; gap: 10px; letter-spacing: -0.5px; }
+  .rpt-market-badge { background: rgba(255,255,255,0.18); border: 1px solid rgba(255,255,255,0.3); border-radius: 20px; padding: 3px 12px; font-size: 11px; color: #fff; font-weight: 600; letter-spacing: 1px; text-transform: uppercase; }
   /* Audience Card */
-  .rpt-audience {{ padding: 20px 36px; background: #f1f5f9; border-bottom: 1px solid #e2e8f0; display: flex; align-items: center; gap: 16px; }}
-  .rpt-audience-avatar {{ width: 48px; height: 48px; border-radius: 50%; background: {EscapeAttr(color)}; color: #fff; font-size: 16px; font-weight: 700; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }}
-  .rpt-audience-label {{ font-size: 11px; text-transform: uppercase; letter-spacing: 0.8px; color: #64748b; font-weight: 600; }}
-  .rpt-audience-name {{ font-size: 17px; font-weight: 700; color: #0f172a; margin-top: 2px; }}
-  .rpt-confidential {{ margin-left: auto; background: #fef3c7; border: 1px solid #fcd34d; border-radius: 6px; padding: 4px 10px; font-size: 10px; font-weight: 700; color: #92400e; letter-spacing: 0.5px; text-transform: uppercase; }}
+  .rpt-audience { padding: 20px 36px; background: #f1f5f9; border-bottom: 1px solid #e2e8f0; display: flex; align-items: center; gap: 16px; }
+  .rpt-audience-avatar { width: 48px; height: 48px; border-radius: 50%; background: {{EscapeAttr(color)}}; color: #fff; font-size: 16px; font-weight: 700; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+  .rpt-audience-label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.8px; color: #64748b; font-weight: 600; }
+  .rpt-audience-name { font-size: 17px; font-weight: 700; color: #0f172a; margin-top: 2px; }
+  .rpt-confidential { margin-left: auto; background: #fef3c7; border: 1px solid #fcd34d; border-radius: 6px; padding: 4px 10px; font-size: 10px; font-weight: 700; color: #92400e; letter-spacing: 0.5px; text-transform: uppercase; }
   /* Body */
-  .rpt-body {{ padding: 32px 36px; }}
-  .rpt-body h1 {{ font-size: 20px; font-weight: 700; color: #0f172a; margin: 0 0 16px; padding-bottom: 8px; border-bottom: 2px solid {EscapeAttr(color)}; }}
-  .rpt-body h2 {{ font-size: 15px; font-weight: 700; color: {EscapeAttr(color)}; margin: 28px 0 10px; padding-left: 10px; border-left: 3px solid {EscapeAttr(color)}; }}
-  .rpt-body h3 {{ font-size: 13px; font-weight: 600; color: #334155; margin: 18px 0 8px; }}
-  .rpt-body p {{ margin: 0 0 12px; color: #334155; }}
-  .rpt-body ul, .rpt-body ol {{ margin: 0 0 12px 20px; }}
-  .rpt-body li {{ margin-bottom: 4px; color: #334155; }}
-  .rpt-body strong {{ color: #0f172a; font-weight: 600; }}
-  .rpt-body em {{ color: #475569; }}
-  .rpt-body table {{ width: 100%; border-collapse: collapse; margin: 16px 0; font-size: 12px; }}
-  .rpt-body th {{ background: {EscapeAttr(color)}; color: #fff; padding: 8px 12px; text-align: left; font-weight: 600; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; }}
-  .rpt-body td {{ padding: 8px 12px; border-bottom: 1px solid #e2e8f0; color: #334155; }}
-  .rpt-body tr:nth-child(even) td {{ background: #f8fafc; }}
-  .rpt-body hr {{ border: none; border-top: 1px solid #e2e8f0; margin: 24px 0; }}
-  .rpt-body blockquote {{ border-left: 3px solid {EscapeAttr(color)}; padding: 8px 16px; margin: 12px 0; background: #f8fafc; color: #475569; font-style: italic; }}
+  .rpt-body { padding: 32px 36px; }
+  .rpt-body h1 { font-size: 20px; font-weight: 700; color: #0f172a; margin: 0 0 16px; padding-bottom: 8px; border-bottom: 2px solid {{EscapeAttr(color)}}; }
+  .rpt-body h2 { font-size: 15px; font-weight: 700; color: {{EscapeAttr(color)}}; margin: 28px 0 10px; padding-left: 10px; border-left: 3px solid {{EscapeAttr(color)}}; }
+  .rpt-body h3 { font-size: 13px; font-weight: 600; color: #334155; margin: 18px 0 8px; }
+  .rpt-body p { margin: 0 0 12px; color: #334155; }
+  .rpt-body ul, .rpt-body ol { margin: 0 0 12px 20px; }
+  .rpt-body li { margin-bottom: 4px; color: #334155; }
+  .rpt-body strong { color: #0f172a; font-weight: 600; }
+  .rpt-body em { color: #475569; }
+  .rpt-body table { width: 100%; border-collapse: collapse; margin: 16px 0; font-size: 12px; }
+  .rpt-body th { background: {{EscapeAttr(color)}}; color: #fff; padding: 8px 12px; text-align: left; font-weight: 600; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; }
+  .rpt-body td { padding: 8px 12px; border-bottom: 1px solid #e2e8f0; color: #334155; }
+  .rpt-body tr:nth-child(even) td { background: #f8fafc; }
+  .rpt-body hr { border: none; border-top: 1px solid #e2e8f0; margin: 24px 0; }
+  .rpt-body blockquote { border-left: 3px solid {{EscapeAttr(color)}}; padding: 8px 16px; margin: 12px 0; background: #f8fafc; color: #475569; font-style: italic; }
   /* Footer */
-  .rpt-footer {{ padding: 16px 36px; background: #f1f5f9; border-top: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center; }}
-  .rpt-footer-left {{ font-size: 11px; color: #64748b; }}
-  .rpt-footer-right {{ font-size: 11px; color: #64748b; text-align: right; }}
-  @media print {{
-    body {{ background: #fff; }}
-    .page {{ box-shadow: none; max-width: 100%; }}
-  }}
+  .rpt-footer { padding: 16px 36px; background: #f1f5f9; border-top: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center; }
+  .rpt-footer-left { font-size: 11px; color: #64748b; }
+  .rpt-footer-right { font-size: 11px; color: #64748b; text-align: right; }
+  @media print {
+    body { background: #fff; }
+    .page { box-shadow: none; max-width: 100%; }
+  }
 </style>
 </head>
 <body>
@@ -1144,40 +1144,40 @@ public sealed class MarketInsightMcpTools
       </div>
     </div>
     <div class="rpt-header-right">
-      <div class="rpt-gen-date">Generated: {EscapeHtml(generatedDate)}</div>
-      <div class="rpt-period">Period: {EscapeHtml(fromDate)} – {EscapeHtml(toDate)}</div>
+      <div class="rpt-gen-date">Generated: {{EscapeHtml(generatedDate)}}</div>
+      <div class="rpt-period">Period: {{EscapeHtml(fromDate)}} – {{EscapeHtml(toDate)}}</div>
     </div>
   </div>
 
   <div class="rpt-banner">
     <div class="rpt-market-title">
-      <span>{icon}</span>
-      <span>{EscapeHtml(market.ToUpperInvariant())} Market Intelligence Report</span>
+      <span>{{icon}}</span>
+      <span>{{EscapeHtml(market.ToUpperInvariant())}} Market Intelligence Report</span>
     </div>
-    <span class="rpt-market-badge">{EscapeHtml(initials)}</span>
+    <span class="rpt-market-badge">{{EscapeHtml(initials)}}</span>
   </div>
 
   <div class="rpt-audience">
-    <div class="rpt-audience-avatar">{EscapeHtml(audienceInitials)}</div>
+    <div class="rpt-audience-avatar">{{EscapeHtml(audienceInitials)}}</div>
     <div>
       <div class="rpt-audience-label">Prepared exclusively for</div>
-      <div class="rpt-audience-name">{EscapeHtml(audience)}</div>
+      <div class="rpt-audience-name">{{EscapeHtml(audience)}}</div>
     </div>
     <span class="rpt-confidential">Confidential</span>
   </div>
 
   <div class="rpt-body">
-    {htmlBody}
+    {{htmlBody}}
   </div>
 
   <div class="rpt-footer">
     <div class="rpt-footer-left">
       Market Insight Agent · Confidential &amp; Proprietary<br/>
-      This report is prepared exclusively for {EscapeHtml(audience)} and may not be redistributed.
+      This report is prepared exclusively for {{EscapeHtml(audience)}} and may not be redistributed.
     </div>
     <div class="rpt-footer-right">
-      Report Date: {EscapeHtml(generatedDate)}<br/>
-      © {DateTime.UtcNow.Year} Market Insight Agent
+      Report Date: {{EscapeHtml(generatedDate)}}<br/>
+      © {{DateTime.UtcNow.Year}} Market Insight Agent
     </div>
   </div>
 </div>

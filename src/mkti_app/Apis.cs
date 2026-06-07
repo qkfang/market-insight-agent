@@ -541,6 +541,12 @@ public static class Apis
 
 }
 
+public sealed record SubscriptionGenerateRequest(
+    IReadOnlyList<string>? Markets,
+    string? Audience,
+    string? From,
+    string? To);
+
 public sealed record SubscriptionRequest(IReadOnlyList<string> Markets, IReadOnlyList<string> Items)
 {
     public string ToJson()

@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using mkti_app.Agents;
 using mkti_app.Services;
 
@@ -19,19 +20,25 @@ public static class Apis
         InsightGenerationAgent insightGenerationAgent,
         SubscriptionAgent subscriptionAgent,
         BlobStorageService blobStorageService,
-        FabricLakehouseService fabricLakehouseService)
+        FabricLakehouseService fabricLakehouseService,
+        ILogger logger)
     {
         app.MapGet("/api/news/ingest", async (string? from, string? to) =>
         {
+            logger.LogInformation("/api/news/ingest called, from={From}, to={To}", from, to);
+            var sw = Stopwatch.StartNew();
             var before = await blobStorageService.ListBlobNamesAsync("news-store");
             var dateArgs = (!string.IsNullOrWhiteSpace(from) && !string.IsNullOrWhiteSpace(to))
                 ? $" Use dateFrom='{from}' and dateTo='{to}'."
                 : string.Empty;
+            logger.LogInformation("Invoking NewsIngestionAgent");
             var result = await newsIngestionAgent.RunAsync($"Ingest articles from the data/articles/ folder and store each one in news-store using {{yyyyMMddHHmmssfff}}_{{guid}}.json blob names.{dateArgs}");
             var after = await blobStorageService.ListBlobNamesAsync("news-store");
 
             var delta = after.Count - before.Count;
             var articlesStored = Math.Max(0, delta);
+            sw.Stop();
+            logger.LogInformation("/api/news/ingest completed in {ElapsedMs}ms, articlesStored={ArticlesStored}", sw.ElapsedMilliseconds, articlesStored);
 
             return Results.Json(new
             {
@@ -123,10 +130,13 @@ public static class Apis
 
         app.MapGet("/api/news/analyze", async () =>
         {
+            logger.LogInformation("/api/news/analyze called");
+            var sw = Stopwatch.StartNew();
             var before = new HashSet<string>(
                 await blobStorageService.ListBlobNamesAsync("news-analysis"),
                 StringComparer.OrdinalIgnoreCase);
 
+            logger.LogInformation("Invoking NewsAnalysisAgent");
             var result = await newsAnalysisAgent.RunAsync(
                 "Analyze all unprocessed news-store JSON articles and store structured analysis in news-analysis using {yyyyMMddHHmmssfff}_{guid}.json blob names.");
 
@@ -138,6 +148,9 @@ public static class Apis
                 int? wordCount = TryGetWordCount(content);
                 results.Add(new { filename = name, wordCount });
             }
+
+            sw.Stop();
+            logger.LogInformation("/api/news/analyze completed in {ElapsedMs}ms, articlesAnalyzed={Count}", sw.ElapsedMilliseconds, results.Count);
 
             return Results.Json(new
             {
@@ -191,6 +204,7 @@ public static class Apis
 
         app.MapGet("/api/market/research", async (string? from, string? to, string? markets) =>
         {
+            logger.LogInformation("/api/market/research called, from={From}, to={To}, markets={Markets}", from, to, markets);
             var allMarkets = new[] { "copper", "gold", "silver", "oil" };
             var selectedMarkets = string.IsNullOrWhiteSpace(markets)
                 ? allMarkets
@@ -217,7 +231,11 @@ public static class Apis
                     $"use bing_search_market for market '{market}' with week range '{weekStartStr} to {weekEndStr}', " +
                     $"then call store_weekly_market_research with market='{market}', weekStart='{weekStartStr}'.";
 
+                logger.LogInformation("Invoking MarketResearchAgent for market={Market}, week={WeekStart}..{WeekEnd}", market, weekStartStr, weekEndStr);
+                var marketSw = Stopwatch.StartNew();
                 var result = await marketResearchAgent.RunAsync(message);
+                marketSw.Stop();
+                logger.LogInformation("MarketResearchAgent completed for market={Market} in {ElapsedMs}ms", market, marketSw.ElapsedMilliseconds);
 
                 string? sentiment = null, summary = null;
                 double? confidence = null;
@@ -251,6 +269,7 @@ public static class Apis
 
         app.MapGet("/api/insight/generate", async (string? from, string? to, string? markets) =>
         {
+            logger.LogInformation("/api/insight/generate called, from={From}, to={To}, markets={Markets}", from, to, markets);
             var allMarkets = new[] { "copper", "gold", "silver", "oil" };
             var selectedMarkets = string.IsNullOrWhiteSpace(markets)
                 ? allMarkets
@@ -278,7 +297,11 @@ public static class Apis
                     $"Date range for context: {fromStr} to {toStr}. " +
                     $"Store the result by calling store_market_insight_for_market with market='{market}' and date='{todayStr}'.";
 
+                logger.LogInformation("Invoking InsightGenerationAgent for market={Market}", market);
+                var insightSw = Stopwatch.StartNew();
                 await insightGenerationAgent.RunAsync(message);
+                insightSw.Stop();
+                logger.LogInformation("InsightGenerationAgent completed for market={Market} in {ElapsedMs}ms", market, insightSw.ElapsedMilliseconds);
 
                 // Read back the stored insight for this market
                 var filename = $"{todayStr}_{market}_insight.md";
@@ -408,6 +431,8 @@ public static class Apis
 
         app.MapPost("/api/subscription/generate", async (SubscriptionGenerateRequest request) =>
         {
+            logger.LogInformation("/api/subscription/generate called, audience={Audience}, markets={Markets}, from={From}, to={To}",
+                request.Audience, request.Markets is null ? null : string.Join(",", request.Markets), request.From, request.To);
             var allMarkets = new[] { "copper", "gold", "silver", "oil" };
             var selectedMarkets = (request.Markets ?? [])
                 .Select(m => m.Trim().ToLowerInvariant())
@@ -431,7 +456,11 @@ public static class Apis
                     $"fromDate='{fromDate}', toDate='{toDate}', and the retrieved insight markdown. " +
                     $"Return the filename from generate_subscription_report.";
 
+                logger.LogInformation("Invoking SubscriptionAgent for market={Market}, audience={Audience}", market, audience);
+                var subSw = Stopwatch.StartNew();
                 var agentResult = await subscriptionAgent.RunAsync(message);
+                subSw.Stop();
+                logger.LogInformation("SubscriptionAgent completed for market={Market} in {ElapsedMs}ms", market, subSw.ElapsedMilliseconds);
 
                 // Try to parse the filename from the agent result
                 string? filename = null;

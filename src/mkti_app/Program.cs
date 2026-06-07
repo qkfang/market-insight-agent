@@ -146,6 +146,7 @@ app.MapAllEndpoints(
     insightGenerationAgent,
     subscriptionAgent,
     blobStorageService,
-    fabricLakehouseService);
+    fabricLakehouseService,
+    loggerFactory.CreateLogger("Apis"));
 
 await app.RunAsync();

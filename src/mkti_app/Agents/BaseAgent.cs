@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using Azure.AI.Projects;
 using Azure.AI.Projects.Agents;
 using Azure.AI.Extensions.OpenAI;
@@ -42,6 +43,10 @@ public abstract class BaseAgent
 
     public async Task<string> RunAsync(string message)
     {
+        var sw = Stopwatch.StartNew();
+        var preview = message.Length > 120 ? message[..120] + "\u2026" : message;
+        _logger.LogInformation("[{AgentId}] RunAsync starting. Message: {Preview}", _agentId, preview);
+
         var responseClient = await EnsureResponseClientAsync();
 
         CreateResponseOptions? nextOptions = new()
@@ -50,24 +55,33 @@ public abstract class BaseAgent
         };
 
         ResponseResult? result = null;
+        var iteration = 0;
 
         while (nextOptions is not null)
         {
+            iteration++;
+            _logger.LogDebug("[{AgentId}] Calling model (iteration {Iteration})", _agentId, iteration);
             result = await responseClient.CreateResponseAsync(nextOptions);
+            _logger.LogDebug("[{AgentId}] Response received (iteration {Iteration}), ResponseId={ResponseId}, OutputItems={Count}",
+                _agentId, iteration, result?.Id, result?.OutputItems?.Count);
             nextOptions = null;
 
             foreach (var item in result.OutputItems)
             {
                 if (item is McpToolCallApprovalRequestItem mcpCall)
                 {
-                    _logger.LogInformation("Auto-approving MCP tool call on {ServerLabel}", mcpCall.ServerLabel);
+                    _logger.LogInformation("[{AgentId}] Auto-approving MCP tool call on {ServerLabel}", _agentId, mcpCall.ServerLabel);
                     nextOptions ??= new CreateResponseOptions { PreviousResponseId = result.Id };
                     nextOptions.InputItems.Add(ResponseItem.CreateMcpApprovalResponseItem(mcpCall.Id, approved: true));
                 }
             }
         }
 
-        return result?.GetOutputText() ?? string.Empty;
+        var output = result?.GetOutputText() ?? string.Empty;
+        sw.Stop();
+        _logger.LogInformation("[{AgentId}] RunAsync completed in {ElapsedMs}ms, {Iterations} iteration(s), output {OutputLength} chars",
+            _agentId, sw.ElapsedMilliseconds, iteration, output.Length);
+        return output;
     }
 
     public Task<AgentStepResult> StartRunAsync(string message)
@@ -101,20 +115,29 @@ public abstract class BaseAgent
 
     private async Task<AgentStepResult> StepAsync(CreateResponseOptions options)
     {
+        _logger.LogDebug("[{AgentId}] StepAsync called, PreviousResponseId={PrevId}",
+            _agentId, options.PreviousResponseId ?? "(none)");
+
         var responseClient = await EnsureResponseClientAsync();
+        var sw = Stopwatch.StartNew();
         var clientResult = await responseClient.CreateResponseAsync(options);
+        sw.Stop();
         var result = clientResult.Value;
+        _logger.LogDebug("[{AgentId}] StepAsync response received in {ElapsedMs}ms, ResponseId={ResponseId}",
+            _agentId, sw.ElapsedMilliseconds, result.Id);
 
         foreach (var item in result.OutputItems)
         {
             if (item is McpToolCallApprovalRequestItem mcpCall)
             {
-                _logger.LogInformation("Awaiting user approval for MCP tool call on {ServerLabel}", mcpCall.ServerLabel);
+                _logger.LogInformation("[{AgentId}] Awaiting user approval for MCP tool call on {ServerLabel}", _agentId, mcpCall.ServerLabel);
                 return new AgentStepResult(null, new PendingToolApproval(result.Id, mcpCall.Id, mcpCall.ServerLabel), result.Id);
             }
         }
 
-        return new AgentStepResult(result.GetOutputText(), null, result.Id);
+        var output = result.GetOutputText();
+        _logger.LogInformation("[{AgentId}] StepAsync completed, output {OutputLength} chars", _agentId, output?.Length ?? 0);
+        return new AgentStepResult(output, null, result.Id);
     }
 
     private async Task<ProjectResponsesClient> EnsureResponseClientAsync()
@@ -127,6 +150,8 @@ public abstract class BaseAgent
         {
             if (_responseClient is not null)
                 return _responseClient;
+
+            _logger.LogInformation("[{AgentId}] Creating agent version for model '{DeploymentName}'", _agentId, _deploymentName);
 
             var agentDefinition = new DeclarativeAgentDefinition(model: _deploymentName)
             {
@@ -142,6 +167,7 @@ public abstract class BaseAgent
                 _agentId,
                 new ProjectsAgentVersionCreationOptions(agentDefinition));
 
+            _logger.LogInformation("[{AgentId}] Agent version '{VersionName}' ready", _agentId, agentVersion.Value.Name);
             _responseClient = _aiProjectClient.ProjectOpenAIClient.GetProjectResponsesClientForAgent(agentVersion.Value.Name);
             return _responseClient;
         }

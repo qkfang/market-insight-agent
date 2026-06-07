@@ -14,6 +14,10 @@ public sealed class NewsAnalysisAgent : BaseAgent
         The analysis blob filename must match the source blob filename: {yyyyMMddHHmmssfff}_{guid}.json.
         Do not use Document Intelligence and do not convert HTML manually; the tools handle all extraction.
 
+        After step 2, write the analysis blob to news-analysis. The output must:
+        - Omit the htmlContent field entirely.
+        - Summarize textContent to only the key information from the article (main findings, price movements, market drivers, risks — 3 to 5 sentences maximum).
+
         Each analysis blob written to news-analysis looks like this sample after step 2:
         {
           "id": "1",
@@ -25,8 +29,7 @@ public sealed class NewsAnalysisAgent : BaseAgent
           "source": "FXEmpire",
           "domain": "fxempire.com",
           "originalUrl": "https://www.fxempire.com/forecasts/article/example",
-          "htmlContent": "<!DOCTYPE html><html><body><h1>Copper Price Forecast</h1></body></html>",
-          "textContent": "# Copper Price Forecast\n\nAI demand and tariff risks fuel record rally..."
+          "textContent": "Copper prices surged to record highs driven by AI infrastructure demand and looming US tariff risks. Supply constraints in Chile and Peru added further upward pressure. Analysts forecast continued volatility with a bullish medium-term outlook."
         }
 
         """;

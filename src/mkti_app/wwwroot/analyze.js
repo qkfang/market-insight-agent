@@ -5,14 +5,7 @@ async function previewAnalysis(filename) {
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
     const data = await response.json();
     if (data.status !== 'ok') throw new Error(data.error || 'Failed to load content.');
-    let markdownContent = data.content;
-    let jsonData = null;
-    try {
-      const parsed = JSON.parse(data.content);
-      markdownContent = parsed.markdownContent || data.content;
-      jsonData = parsed;
-    } catch {}
-    showModalWithTabs(filename, markdownContent, jsonData);
+    showModalWithTabs(filename, data.content, data.content);
   } catch (e) {
     showModal(filename, `Error: ${e.message}`);
   }

@@ -31,12 +31,13 @@ function showModal(title, body) {
   document.body.appendChild(overlay);
 }
 
-function showModalWithTabs(title, markdownContent, jsonData) {
+function showModalWithTabs(title, markdownContent, jsonContent) {
   closeModal();
   const overlay = document.createElement('div');
   overlay.id = 'modal-overlay';
   overlay.className = 'modal-overlay';
-  const jsonFormatted = jsonData != null ? JSON.stringify(jsonData, null, 2) : (markdownContent || '');
+  let jsonFormatted = jsonContent || '';
+  try { jsonFormatted = JSON.stringify(JSON.parse(jsonContent), null, 2); } catch {}
   overlay.innerHTML = `
     <div class="modal">
       <div class="modal-header">
@@ -45,7 +46,7 @@ function showModalWithTabs(title, markdownContent, jsonData) {
       </div>
       <div class="modal-tabs">
         <button class="modal-tab-btn active" data-tab="markdown">📄 Markdown</button>
-        <button class="modal-tab-btn" data-tab="json">{ } Raw JSON</button>
+        <button class="modal-tab-btn" data-tab="json">{ } JSON</button>
       </div>
       <div class="modal-body">
         <div class="modal-tab-content" id="modal-tab-markdown">

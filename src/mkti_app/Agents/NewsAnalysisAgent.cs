@@ -14,7 +14,7 @@ public sealed class NewsAnalysisAgent : BaseAgent
         The analysis blob filename must match the source blob filename: {yyyyMMddHHmmssfff}_{guid}.json.
         Do not use Document Intelligence and do not convert HTML manually; the tools handle all extraction.
 
-        Each article in news-store looks like this sample after step 1:
+        Each analysis blob written to news-analysis looks like this sample after step 2:
         {
           "id": "1",
           "guid": "3f3d8a16-355f-4a9e-a03b-cd744f6bf915",

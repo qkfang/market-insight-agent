@@ -12,7 +12,7 @@ public sealed class NewsIngestionAgent : BaseAgent
         The blob filename must be {yyyyMMddHHmmssfff}_{guid}.json, where the timestamp is derived from the article datetime in JSON and guid is from the JSON payload.
         Do not download RSS feeds and do not transform article content into HTML.
 
-        Each article in the JSON array looks like this sample:
+        Each analysis blob written to news-store looks like :
         {
           "id": "1",
           "guid": "3f3d8a16-355f-4a9e-a03b-cd744f6bf915",

@@ -5,6 +5,7 @@ namespace mkti_app;
 
 public static class Apis
 {
+    private const string DataFolderName = "data";
     private const string KnowledgeArticlesFileName = "articles.json";
     private const string MockRssArticlesFileName = "articles-june.json";
     private const string MockRssFallbackFileName = "articles.json";
@@ -392,12 +393,13 @@ public static class Apis
         string? fallbackFileName = null)
     {
         string? resolvedPath = null;
-        var primaryPath = Path.Combine(env.WebRootPath, primaryFileName);
+        var dataRootPath = Path.Combine(env.ContentRootPath, DataFolderName);
+        var primaryPath = Path.Combine(dataRootPath, primaryFileName);
         if (File.Exists(primaryPath))
             resolvedPath = primaryPath;
         else if (!string.IsNullOrWhiteSpace(fallbackFileName))
         {
-            var fallbackPath = Path.Combine(env.WebRootPath, fallbackFileName);
+            var fallbackPath = Path.Combine(dataRootPath, fallbackFileName);
             if (File.Exists(fallbackPath))
                 resolvedPath = fallbackPath;
         }

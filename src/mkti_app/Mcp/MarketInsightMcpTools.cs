@@ -1,7 +1,9 @@
 using System.ComponentModel;
+using System.Globalization;
 using System.Net.Http.Headers;
 using System.Text.Json;
 using System.Xml.Linq;
+using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.Configuration;
 using mkti_app.Services;
 using ModelContextProtocol.Server;
@@ -11,6 +13,9 @@ namespace mkti_app.Mcp;
 [McpServerToolType]
 public sealed class MarketInsightMcpTools
 {
+    private const string DataFolderName = "data";
+    private const string ArticlesFilePattern = "articles-*.json";
+    private const string FallbackArticlesFileName = "articles.json";
     private const string NewsStoreContainer = "news-store";
     private const string NewsAnalysisContainer = "news-analysis";
     private const string MarketInsightContainer = "market-insight";
@@ -19,6 +24,7 @@ public sealed class MarketInsightMcpTools
     private static readonly JsonSerializerOptions JsonOptions = new() { WriteIndented = false };
 
     private readonly string[] _defaultRssFeeds;
+    private readonly IWebHostEnvironment _environment;
     private readonly BlobStorageService _blobStorageService;
     private readonly DocIntelligenceService _docIntelligenceService;
     private readonly FabricLakehouseService _fabricLakehouseService;
@@ -26,6 +32,7 @@ public sealed class MarketInsightMcpTools
     private readonly IHttpClientFactory _httpClientFactory;
 
     public MarketInsightMcpTools(
+        IWebHostEnvironment environment,
         BlobStorageService blobStorageService,
         DocIntelligenceService docIntelligenceService,
         FabricLakehouseService fabricLakehouseService,
@@ -33,6 +40,7 @@ public sealed class MarketInsightMcpTools
         IHttpClientFactory httpClientFactory,
         IConfiguration configuration)
     {
+        _environment = environment;
         _blobStorageService = blobStorageService;
         _docIntelligenceService = docIntelligenceService;
         _fabricLakehouseService = fabricLakehouseService;
@@ -40,6 +48,74 @@ public sealed class MarketInsightMcpTools
         _httpClientFactory = httpClientFactory;
         var appMcpUrl = configuration["APP_MCP_URL"] ?? "http://localhost:5001";
         _defaultRssFeeds = [$"{appMcpUrl.TrimEnd('/')}/api/mock/rss"];
+    }
+
+    [McpServerTool(Name = "ingest_articles_json_to_news_store"), Description("Load local articles-xx.json and store each article object unchanged to the news-store container and Fabric Lakehouse news-store folder. Blob name format is {yyyyMMddHHmmssfff}_{guid}.json where timestamp comes from the article datetime and guid comes from JSON.")]
+    public async Task<string> IngestArticlesJsonToNewsStore(
+        [Description("Optional JSON filename under the app data folder, e.g. articles-june.json. Defaults to latest articles-*.json, then articles.json.")] string? fileName = null)
+    {
+        var resolvedPath = ResolveArticlesFilePath(fileName);
+        if (resolvedPath is null)
+            return "Error: no articles JSON file found in the data folder.";
+
+        var payload = await File.ReadAllTextAsync(resolvedPath);
+        JsonDocument doc;
+        try
+        {
+            doc = JsonDocument.Parse(payload);
+        }
+        catch (JsonException ex)
+        {
+            return $"Error: invalid JSON in '{Path.GetFileName(resolvedPath)}': {ex.Message}";
+        }
+
+        using (doc)
+        {
+            if (doc.RootElement.ValueKind != JsonValueKind.Array)
+                return $"Error: '{Path.GetFileName(resolvedPath)}' must contain a JSON array of article objects.";
+
+            var stored = new List<string>();
+            var skipped = new List<object>();
+
+            foreach (var article in doc.RootElement.EnumerateArray())
+            {
+                if (article.ValueKind != JsonValueKind.Object)
+                {
+                    skipped.Add(new { reason = "non-object article entry" });
+                    continue;
+                }
+
+                if (!TryGetGuidFromArticle(article, out var articleGuid))
+                {
+                    var id = TryGetString(article, "id") ?? "(unknown)";
+                    skipped.Add(new { id, reason = "missing or invalid guid" });
+                    continue;
+                }
+
+                var articleDateTime = GetArticleDateTime(article);
+                var blobName = $"{articleDateTime:yyyyMMddHHmmssfff}_{articleGuid:D}.json";
+
+                if (await _blobStorageService.ExistsAsync(NewsStoreContainer, blobName))
+                {
+                    skipped.Add(new { guid = articleGuid.ToString("D"), reason = "already exists", blobName });
+                    continue;
+                }
+
+                var articleJson = article.GetRawText();
+                await _blobStorageService.WriteTextAsync(NewsStoreContainer, blobName, articleJson, "application/json");
+                await _fabricLakehouseService.WriteFileAsync($"news-store/{blobName}", articleJson);
+                stored.Add(blobName);
+            }
+
+            return JsonSerializer.Serialize(new
+            {
+                sourceFile = Path.GetFileName(resolvedPath),
+                storedCount = stored.Count,
+                skippedCount = skipped.Count,
+                filenames = stored,
+                skipped
+            }, JsonOptions);
+        }
     }
 
     [McpServerTool(Name = "fetch_rss_feed"), Description("Download and parse a copper market RSS/Atom feed. Returns a JSON array of articles with title, url, publishDate and description.")]
@@ -475,6 +551,58 @@ public sealed class MarketInsightMcpTools
         var token = name.Split('_', '.').FirstOrDefault();
         return DateTime.TryParseExact(token, "yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture,
             System.Globalization.DateTimeStyles.None, out _) ? token : null;
+    }
+
+    private string? ResolveArticlesFilePath(string? fileName)
+    {
+        var dataRoot = Path.Combine(_environment.ContentRootPath, DataFolderName);
+        if (!Directory.Exists(dataRoot))
+            return null;
+
+        if (!string.IsNullOrWhiteSpace(fileName))
+        {
+            var candidate = Path.Combine(dataRoot, fileName.Trim());
+            return File.Exists(candidate) ? candidate : null;
+        }
+
+        var latestMatching = Directory.GetFiles(dataRoot, ArticlesFilePattern, SearchOption.TopDirectoryOnly)
+            .OrderByDescending(File.GetLastWriteTimeUtc)
+            .FirstOrDefault();
+        if (!string.IsNullOrWhiteSpace(latestMatching))
+            return latestMatching;
+
+        var fallback = Path.Combine(dataRoot, FallbackArticlesFileName);
+        return File.Exists(fallback) ? fallback : null;
+    }
+
+    private static string? TryGetString(JsonElement article, string propertyName)
+    {
+        if (!article.TryGetProperty(propertyName, out var element) || element.ValueKind != JsonValueKind.String)
+            return null;
+        var value = element.GetString();
+        return string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+    }
+
+    private static bool TryGetGuidFromArticle(JsonElement article, out Guid guid)
+    {
+        var guidValue = TryGetString(article, "guid") ?? TryGetString(article, "id");
+        return Guid.TryParse(guidValue, out guid);
+    }
+
+    private static DateTimeOffset GetArticleDateTime(JsonElement article)
+    {
+        var iso = TryGetString(article, "publishDateIso")
+            ?? TryGetString(article, "publishDate")
+            ?? TryGetString(article, "dateTime")
+            ?? TryGetString(article, "timestamp");
+
+        if (!string.IsNullOrWhiteSpace(iso)
+            && DateTimeOffset.TryParse(iso, CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind, out var parsed))
+        {
+            return parsed;
+        }
+
+        return DateTimeOffset.UtcNow;
     }
 
     private HttpClient CreateClient()

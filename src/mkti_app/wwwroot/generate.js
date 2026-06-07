@@ -72,7 +72,7 @@ async function previewInsight(filename) {
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
     const data = await response.json();
     if (data.status !== 'ok') throw new Error(data.error || 'Failed to load content.');
-    showModalWithTabs(filename, data.content, data.content);
+    showModalWithTabs(filename, data.content, JSON.stringify(data, null, 2));
   } catch (e) {
     showModal(filename, `Error: ${e.message}`);
   }

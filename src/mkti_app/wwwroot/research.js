@@ -1,5 +1,7 @@
 const btn = document.getElementById('research-btn');
 const spinner = document.getElementById('research-spinner');
+const fromInput = document.getElementById('research-from');
+const toInput = document.getElementById('research-to');
 const resultEl = document.getElementById('research-result');
 const pre = document.getElementById('result');
 
@@ -46,7 +48,10 @@ btn.onclick = async () => {
   pre.hidden = true;
   pre.textContent = '';
   try {
-    const response = await fetch('/api/market/research');
+    const params = new URLSearchParams();
+    if (fromInput.value) params.set('from', fromInput.value);
+    if (toInput.value) params.set('to', toInput.value);
+    const response = await fetch(`/api/market/research?${params}`);
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
     const json = await response.json();
     if (json.status === 'error') throw new Error(json.error || 'Research failed.');

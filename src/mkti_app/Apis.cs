@@ -188,17 +188,17 @@ public static class Apis
             return Results.Json(new { status = "ok", content });
         });
 
-        app.MapGet("/api/market/research", async () =>
+        app.MapGet("/api/market/research", async (string? from, string? to) =>
         {
             var markets = new[] { "copper", "gold", "silver", "oil" };
 
-            // Compute the Monday (weekStart) and Sunday (weekEnd) for the current UTC week.
+            // Use provided from/to, or fall back to the Monday–Sunday of the current UTC week.
             var today = DateTime.UtcNow.Date;
             var daysFromMonday = ((int)today.DayOfWeek + 6) % 7;
             var weekStart = today.AddDays(-daysFromMonday);
             var weekEnd = weekStart.AddDays(6);
-            var weekStartStr = weekStart.ToString("yyyy-MM-dd");
-            var weekEndStr = weekEnd.ToString("yyyy-MM-dd");
+            var weekStartStr = !string.IsNullOrWhiteSpace(from) ? from : weekStart.ToString("yyyy-MM-dd");
+            var weekEndStr   = !string.IsNullOrWhiteSpace(to)   ? to   : weekEnd.ToString("yyyy-MM-dd");
 
             var results = new List<object>();
             foreach (var market in markets)
@@ -242,9 +242,12 @@ public static class Apis
             });
         });
 
-        app.MapGet("/api/insight/generate", async () =>
+        app.MapGet("/api/insight/generate", async (string? from, string? to) =>
         {
-            await insightGenerationAgent.RunAsync("Generate today's copper market insight report and store it in markdown.");
+            var today = DateTime.UtcNow.Date;
+            var fromStr = !string.IsNullOrWhiteSpace(from) ? from : today.ToString("yyyy-MM-dd");
+            var toStr   = !string.IsNullOrWhiteSpace(to)   ? to   : today.ToString("yyyy-MM-dd");
+            await insightGenerationAgent.RunAsync($"Generate the copper market insight report for the date range {fromStr} to {toStr} and store it in markdown.");
             var latest = await ReadLatestInsightAsync(blobStorageService);
             var preview = latest.Content.Length > InsightPreviewMaxLength
                 ? latest.Content[..InsightPreviewMaxLength]

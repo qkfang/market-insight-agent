@@ -9,6 +9,8 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.Configuration;
 using mkti_app.Services;
 using ModelContextProtocol.Server;
+using PuppeteerSharp;
+using PuppeteerSharp.Media;
 
 namespace mkti_app.Mcp;
 
@@ -1086,6 +1088,57 @@ public sealed class MarketInsightMcpTools
             market = safeMarket,
             audience = safeAudience,
             htmlBase64 = Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes(htmlContent))
+        }, JsonOptions);
+    }
+
+    [McpServerTool(Name = "generate_pdf_report"), Description("Generate a PDF file from a subscription HTML report and save it to the website temp folder. Call this after generate_subscription_report. Returns JSON with pdfFilename and pdfUrl.")]
+    public async Task<string> GeneratePdfReport(
+        [Description("HTML report filename from generate_subscription_report, e.g. '2026-06-08_copper_global-metals-corp_report.html'")] string htmlFilename)
+    {
+        var safeFilename = Path.GetFileName(htmlFilename?.Trim() ?? string.Empty);
+        if (string.IsNullOrEmpty(safeFilename) || safeFilename != htmlFilename?.Trim())
+            return JsonSerializer.Serialize(new { error = "Invalid filename" }, JsonOptions);
+
+        var htmlContent = await _blobStorageService.ReadTextAsync(SubscriptionReportsContainer, safeFilename);
+        if (htmlContent is null)
+            return JsonSerializer.Serialize(new { error = $"Report '{safeFilename}' not found" }, JsonOptions);
+
+        var webRoot = _environment.WebRootPath;
+        if (string.IsNullOrWhiteSpace(webRoot))
+            webRoot = Path.Combine(_environment.ContentRootPath, "wwwroot");
+        var tempDir = Path.Combine(webRoot, "temp");
+        Directory.CreateDirectory(tempDir);
+
+        var pdfFilename = Path.ChangeExtension(safeFilename, ".pdf");
+        var pdfPath = Path.Combine(tempDir, pdfFilename);
+
+        try
+        {
+            await new BrowserFetcher().DownloadAsync();
+            await using var browser = await Puppeteer.LaunchAsync(new LaunchOptions
+            {
+                Headless = true,
+                Args = ["--no-sandbox", "--disable-setuid-sandbox", "--disable-dev-shm-usage"]
+            });
+            await using var page = await browser.NewPageAsync();
+            await page.SetContentAsync(htmlContent, new SetContentOptions { WaitUntil = [WaitUntilNavigation.DOMContentLoaded] });
+            await page.PdfAsync(pdfPath, new PdfOptions
+            {
+                Format = PaperFormat.A4,
+                PrintBackground = true,
+                MarginOptions = new MarginOptions { Top = "20mm", Bottom = "20mm", Left = "15mm", Right = "15mm" }
+            });
+        }
+        catch (Exception ex)
+        {
+            return JsonSerializer.Serialize(new { error = $"PDF generation failed: {ex.Message}" }, JsonOptions);
+        }
+
+        return JsonSerializer.Serialize(new
+        {
+            pdfFilename,
+            pdfUrl = $"/temp/{pdfFilename}",
+            success = true
         }, JsonOptions);
     }
 

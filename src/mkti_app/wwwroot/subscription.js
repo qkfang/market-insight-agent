@@ -1,59 +1,40 @@
-// ── Insight Reports Viewer (formerly Insight Delivery) ───────────────────────
-(async function initDelivery() {
+// ── Insight Reports Viewer ────────────────────────────────────────────────────
+async function showInsightForMarket(market) {
   await loadMarked();
-
-  const select  = document.getElementById('delivery-select');
-  const dateEl  = document.getElementById('delivery-date');
+  const panel   = document.getElementById('insight-reports-panel');
   const content = document.getElementById('delivery-content');
+  const dateEl  = document.getElementById('delivery-date');
+  const descEl  = document.getElementById('insight-panel-desc');
 
-  function showInsight(payload) {
-    if (!payload || !payload.content) {
-      content.innerHTML = '<p style="color:var(--color-text-muted)">No insight report available. Generate one first.</p>';
-      dateEl.textContent = '';
-      return;
-    }
-    dateEl.textContent = payload.date ? `Report date: ${payload.date}` : '';
-    renderMarkdown(content, payload.content);
-  }
-
-  async function loadLatest() {
-    try {
-      const r = await fetch('/api/insight/latest');
-      if (!r.ok) throw new Error(`HTTP ${r.status}`);
-      showInsight(await r.json());
-    } catch (e) {
-      content.innerHTML = `<p style="color:var(--color-text-muted)">No insight available.</p>`;
-    }
-  }
-
-  async function loadByDate(date) {
-    if (!date) return loadLatest();
-    try {
-      const r = await fetch(`/api/insight/byDate?date=${encodeURIComponent(date)}`);
-      if (!r.ok) throw new Error(`HTTP ${r.status}`);
-      showInsight(await r.json());
-    } catch (e) {
-      content.innerHTML = `<p class="research-error">Error: ${escapeHtml(e.message)}</p>`;
-    }
-  }
+  panel.style.display = 'block';
+  content.innerHTML = '<p style="color:var(--color-text-muted)">Loading insight…</p>';
+  if (descEl) descEl.textContent = `Matched market insight — ${market.toUpperCase()}`;
 
   try {
     const listR = await fetch('/api/insight/list');
-    if (listR.ok) {
-      const listJson = await listR.json();
-      (listJson.reports || []).forEach(r => {
-        if (!r.date) return;
-        const opt = document.createElement('option');
-        opt.value = r.date;
-        opt.textContent = r.filename || r.date;
-        select.appendChild(opt);
-      });
-    }
-  } catch {}
+    if (!listR.ok) throw new Error(`HTTP ${listR.status}`);
+    const listJson = await listR.json();
 
-  select.onchange = () => loadByDate(select.value);
-  await loadLatest();
-})();
+    const match = (listJson.reports || [])
+      .filter(r => r.market === market)
+      .sort((a, b) => (b.date || '').localeCompare(a.date || ''))
+      [0];
+
+    if (!match || !match.filename) {
+      content.innerHTML = '<p style="color:var(--color-text-muted)">No insight report found for this market. Generate insights first.</p>';
+      dateEl.textContent = '';
+      return;
+    }
+
+    const r = await fetch(`/api/insight/content?name=${encodeURIComponent(match.filename)}`);
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    const json = await r.json();
+    dateEl.textContent = match.date ? `Report date: ${match.date}` : '';
+    renderMarkdown(content, json.content || '');
+  } catch (e) {
+    content.innerHTML = `<p class="research-error">Error loading insight: ${escapeHtml(e.message)}</p>`;
+  }
+}
 
 // ── Subscription Report Generator ────────────────────────────────────────────
 const generateBtn  = document.getElementById('subscription-generate');
@@ -96,6 +77,11 @@ generateBtn.onclick = async () => {
 
     subStatus.innerHTML = `<p style="color:var(--color-success);font-size:13px;">✓ ${(json.reports || []).length} report(s) generated for <strong>${escapeHtml(audience)}</strong>.</p>`;
 
+    // Show the insight for the first selected market
+    if (selectedMarkets.length > 0) {
+      await showInsightForMarket(selectedMarkets[0]);
+    }
+
     renderPdfReports(json.reports || [], audience);
   } catch (e) {
     subStatus.innerHTML = `<p class="research-error">Error: ${escapeHtml(e.message)}</p>`;
@@ -124,6 +110,7 @@ function renderPdfReports(reports, audience) {
       </div>
       <div style="display:flex;gap:8px;align-items:center;">
         ${r.reportUrl ? `<a class="action" style="padding:4px 12px;font-size:12px;" href="${escapeHtml(r.reportUrl)}" target="_blank">🔗 Open in Tab</a>` : ''}
+        ${r.pdfUrl ? `<a class="action" style="padding:4px 12px;font-size:12px;" href="${escapeHtml(r.pdfUrl)}" target="_blank" download>📄 Download PDF</a>` : ''}
         <button class="action" style="padding:4px 12px;font-size:12px;" onclick="printFrame('frame-${escapeHtml(r.market)}')">🖨️ Print / Save PDF</button>
       </div>`;
 

@@ -78,21 +78,18 @@
       <div id="sub-status"></div>
     </div>
 
-    <!-- Insight Reports Viewer (formerly Insight Delivery) -->
-    <div class="panel" style="margin-top:20px;">
+    <!-- Insight Reports Viewer -->
+    <div id="insight-reports-panel" class="panel" style="margin-top:20px;display:none;">
       <div class="panel-header">
         <div>
-          <h2 class="panel-title">Insight Reports</h2>
-          <p class="panel-desc">Browse previously generated market insight reports.</p>
+          <h2 class="panel-title">Market Insight Report</h2>
+          <p class="panel-desc" id="insight-panel-desc">Matched market insight for the selected market.</p>
         </div>
-        <div id="delivery-controls">
-          <label>Previous Reports:
-            <select id="delivery-select"><option value="">Latest</option></select>
-          </label>
-          <span id="delivery-date" style="font-size:12px;color:var(--color-text-muted);margin-left:8px;"></span>
+        <div>
+          <span id="delivery-date" style="font-size:12px;color:var(--color-text-muted);"></span>
         </div>
       </div>
-      <article id="delivery-content" class="markdown">Loading…</article>
+      <article id="delivery-content" class="markdown"></article>
     </div>
 
     <!-- Generated PDF Reports -->

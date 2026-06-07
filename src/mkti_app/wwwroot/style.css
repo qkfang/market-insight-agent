@@ -454,7 +454,7 @@ table.analysis tbody tr:last-child td { border-bottom: none; }
   font-family: var(--font-mono);
   font-size: 12px;
   line-height: 1.6;
-  color: var(--color-text);
+  color: #ffffff;
   margin: 0;
   white-space: pre-wrap;
   word-break: break-all;

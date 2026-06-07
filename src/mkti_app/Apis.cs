@@ -500,12 +500,16 @@ public static class Apis
                 // Try to parse the filename from the agent result
                 string? filename = null;
                 string? htmlBase64 = null;
+                string? pdfFilename = null;
+                string? pdfUrl = null;
                 try
                 {
                     using var doc = System.Text.Json.JsonDocument.Parse(agentResult);
                     var root = doc.RootElement;
                     if (root.TryGetProperty("filename", out var fn)) filename = fn.GetString();
                     if (root.TryGetProperty("htmlBase64", out var hb)) htmlBase64 = hb.GetString();
+                    if (root.TryGetProperty("pdfFilename", out var pfn)) pdfFilename = pfn.GetString();
+                    if (root.TryGetProperty("pdfUrl", out var pu)) pdfUrl = pu.GetString();
                 }
                 catch
                 {
@@ -522,13 +526,23 @@ public static class Apis
                         htmlBase64 = Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes(htmlContent));
                 }
 
+                // Derive pdfUrl from filename if agent didn't return it
+                if (string.IsNullOrEmpty(pdfUrl) && !string.IsNullOrEmpty(filename))
+                {
+                    var derivedPdf = System.IO.Path.ChangeExtension(filename, ".pdf");
+                    pdfFilename = derivedPdf;
+                    pdfUrl = $"/temp/{derivedPdf}";
+                }
+
                 results.Add(new
                 {
                     market,
                     audience,
                     filename = filename ?? string.Empty,
                     reportUrl = string.IsNullOrEmpty(filename) ? string.Empty : $"/api/subscription/report/{Uri.EscapeDataString(filename)}",
-                    htmlBase64 = htmlBase64 ?? string.Empty
+                    htmlBase64 = htmlBase64 ?? string.Empty,
+                    pdfFilename = pdfFilename ?? string.Empty,
+                    pdfUrl = pdfUrl ?? string.Empty
                 });
             }
 

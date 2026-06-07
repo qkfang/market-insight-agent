@@ -967,55 +967,20 @@ public sealed class MarketInsightMcpTools
         }
     }
 
+    private static readonly ReverseMarkdown.Converter _markdownConverter = new(new ReverseMarkdown.Config
+    {
+        UnknownTags = ReverseMarkdown.Config.UnknownTagsOption.Bypass,
+        GithubFlavored = true,
+        RemoveComments = true,
+        SmartHrefHandling = true
+    });
+
     private static string HtmlToMarkdown(string html)
     {
         if (string.IsNullOrWhiteSpace(html))
             return string.Empty;
 
-        // Remove script and style blocks entirely
-        var result = Regex.Replace(html, @"<(script|style)\b[^>]*>[\s\S]*?</(script|style)>", string.Empty, RegexOptions.IgnoreCase);
-
-        // Convert headings
-        result = Regex.Replace(result, @"<h1\b[^>]*>([\s\S]*?)</h1>", m => $"\n# {StripTags(m.Groups[1].Value).Trim()}\n\n", RegexOptions.IgnoreCase);
-        result = Regex.Replace(result, @"<h2\b[^>]*>([\s\S]*?)</h2>", m => $"\n## {StripTags(m.Groups[1].Value).Trim()}\n\n", RegexOptions.IgnoreCase);
-        result = Regex.Replace(result, @"<h3\b[^>]*>([\s\S]*?)</h3>", m => $"\n### {StripTags(m.Groups[1].Value).Trim()}\n\n", RegexOptions.IgnoreCase);
-        result = Regex.Replace(result, @"<h[4-6]\b[^>]*>([\s\S]*?)</h[4-6]>", m => $"\n#### {StripTags(m.Groups[1].Value).Trim()}\n\n", RegexOptions.IgnoreCase);
-
-        // Convert bold/strong
-        result = Regex.Replace(result, @"<(?:b|strong)\b[^>]*>([\s\S]*?)</(?:b|strong)>", m => $"**{StripTags(m.Groups[1].Value).Trim()}**", RegexOptions.IgnoreCase);
-
-        // Convert italic/em
-        result = Regex.Replace(result, @"<(?:i|em)\b[^>]*>([\s\S]*?)</(?:i|em)>", m => $"*{StripTags(m.Groups[1].Value).Trim()}*", RegexOptions.IgnoreCase);
-
-        // Convert links
-        result = Regex.Replace(result, @"<a\b[^>]+href=[""']([^""']*)[""'][^>]*>([\s\S]*?)</a>", m => $"[{StripTags(m.Groups[2].Value).Trim()}]({m.Groups[1].Value})", RegexOptions.IgnoreCase);
-
-        // Convert list items
-        result = Regex.Replace(result, @"<li\b[^>]*>([\s\S]*?)</li>", m => $"\n- {StripTags(m.Groups[1].Value).Trim()}", RegexOptions.IgnoreCase);
-
-        // Convert paragraphs
-        result = Regex.Replace(result, @"<p\b[^>]*>([\s\S]*?)</p>", m =>
-        {
-            var text = StripTags(m.Groups[1].Value).Trim();
-            return string.IsNullOrWhiteSpace(text) ? "\n" : $"\n{text}\n";
-        }, RegexOptions.IgnoreCase);
-
-        // Convert line breaks
-        result = Regex.Replace(result, @"<br\s*/?>", "\n", RegexOptions.IgnoreCase);
-
-        // Block structural elements → newlines
-        result = Regex.Replace(result, @"</?(div|section|article|main|header|footer|nav|aside|figure|figcaption)\b[^>]*>", "\n", RegexOptions.IgnoreCase);
-
-        // Remove remaining HTML tags
-        result = StripTags(result);
-
-        // Decode HTML entities
-        result = WebUtility.HtmlDecode(result);
-
-        // Collapse 3+ consecutive newlines to 2
-        result = Regex.Replace(result, @"\n{3,}", "\n\n");
-
-        return result.Trim();
+        return _markdownConverter.Convert(html).Trim();
     }
 
     private static string StripTags(string html)

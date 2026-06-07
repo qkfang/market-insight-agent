@@ -16,6 +16,7 @@
     <PackageReference Include="Azure.Monitor.OpenTelemetry.AspNetCore" Version="*" />
     <PackageReference Include="ModelContextProtocol.AspNetCore" Version="*" />
     <PackageReference Include="OpenTelemetry.Instrumentation.Http" Version="*" />
+    <PackageReference Include="ReverseMarkdown" Version="5.3.0" />
     <PackageReference Include="Swashbuckle.AspNetCore" Version="*" />
   </ItemGroup>
 

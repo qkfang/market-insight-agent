@@ -25,7 +25,6 @@ public sealed class NewsAnalysisAgent : BaseAgent
           "source": "FXEmpire",
           "domain": "fxempire.com",
           "originalUrl": "https://www.fxempire.com/forecasts/article/example",
-          "htmlContent": "<!DOCTYPE html><html><body><h1>Copper Price Forecast</h1></body></html>",
           "textContent": "# Copper Price Forecast\n\nAI demand and tariff risks fuel record rally..."
         }
 

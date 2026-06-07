@@ -1,16 +1,18 @@
 async function previewAnalysis(filename) {
-  showModal(filename, 'Loading...');
+  showModal(filename, 'Loading…');
   try {
     const response = await fetch(`/api/news/analysis/content?name=${encodeURIComponent(filename)}`);
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
     const data = await response.json();
     if (data.status !== 'ok') throw new Error(data.error || 'Failed to load content.');
-    let body = data.content;
+    let markdownContent = data.content;
+    let jsonData = null;
     try {
       const parsed = JSON.parse(data.content);
-      body = parsed.markdownContent || data.content;
+      markdownContent = parsed.markdownContent || data.content;
+      jsonData = parsed;
     } catch {}
-    showModal(filename, body);
+    showModalWithTabs(filename, markdownContent, jsonData);
   } catch (e) {
     showModal(filename, `Error: ${e.message}`);
   }

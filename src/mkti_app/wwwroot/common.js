@@ -31,6 +31,46 @@ function showModal(title, body) {
   document.body.appendChild(overlay);
 }
 
+function showModalWithTabs(title, markdownContent, jsonData) {
+  closeModal();
+  const overlay = document.createElement('div');
+  overlay.id = 'modal-overlay';
+  overlay.className = 'modal-overlay';
+  const jsonFormatted = jsonData != null ? JSON.stringify(jsonData, null, 2) : (markdownContent || '');
+  overlay.innerHTML = `
+    <div class="modal">
+      <div class="modal-header">
+        <strong>${escapeHtml(title)}</strong>
+        <button class="modal-close" type="button">&times;</button>
+      </div>
+      <div class="modal-tabs">
+        <button class="modal-tab-btn active" data-tab="markdown">📄 Markdown</button>
+        <button class="modal-tab-btn" data-tab="json">{ } Raw JSON</button>
+      </div>
+      <div class="modal-body">
+        <div class="modal-tab-content" id="modal-tab-markdown">
+          <div class="modal-markdown-body">Loading…</div>
+        </div>
+        <div class="modal-tab-content hidden" id="modal-tab-json">
+          <pre class="modal-json-body">${escapeHtml(jsonFormatted)}</pre>
+        </div>
+      </div>
+    </div>`;
+  overlay.addEventListener('click', (e) => { if (e.target === overlay) closeModal(); });
+  overlay.querySelector('.modal-close').onclick = closeModal;
+  overlay.querySelectorAll('.modal-tab-btn').forEach(btn => {
+    btn.onclick = () => {
+      overlay.querySelectorAll('.modal-tab-btn').forEach(b => b.classList.remove('active'));
+      overlay.querySelectorAll('.modal-tab-content').forEach(c => c.classList.add('hidden'));
+      btn.classList.add('active');
+      overlay.querySelector(`#modal-tab-${btn.dataset.tab}`).classList.remove('hidden');
+    };
+  });
+  document.body.appendChild(overlay);
+  const mdEl = overlay.querySelector('.modal-markdown-body');
+  loadMarked().then(() => renderMarkdown(mdEl, markdownContent || ''));
+}
+
 function loadMarked() {
   return new Promise((resolve) => {
     if (window.marked) return resolve(true);

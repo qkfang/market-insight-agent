@@ -86,7 +86,7 @@ public static class Apis
         {
             var baseUrl = $"{httpContext.Request.Scheme}://{httpContext.Request.Host}";
             var client = httpClientFactory.CreateClient();
-            client.Timeout = TimeSpan.FromMinutes(10);
+            client.Timeout = TimeSpan.FromMinutes(120);
 
             // Step 1: Ingest (same as Ingest tab)
             var ingestParams = new System.Collections.Specialized.NameValueCollection();
@@ -106,25 +106,60 @@ public static class Apis
             var analyzeJson = await analyzeResponse.Content.ReadAsStringAsync();
             var analyzeResult = System.Text.Json.JsonSerializer.Deserialize<System.Text.Json.JsonElement>(analyzeJson);
 
-            // Step 3: Research (same as Research tab)
-            var researchResponse = await client.GetAsync($"{baseUrl}/api/market/research");
-            researchResponse.EnsureSuccessStatusCode();
-            var researchJson = await researchResponse.Content.ReadAsStringAsync();
-            var researchResult = System.Text.Json.JsonSerializer.Deserialize<System.Text.Json.JsonElement>(researchJson);
+            // Step 3: Research — iterate week by week over the date range, all 4 markets each week
+            const string allMarkets = "copper,gold,silver,oil";
+            var startDate = DateOnly.TryParse(from, out var sd) ? sd : new DateOnly(2026, 3, 1);
+            var endDate   = DateOnly.TryParse(to,   out var ed) ? ed : DateOnly.FromDateTime(DateTime.UtcNow.Date);
 
-            // Step 4: Generate insight (same as Generate tab)
-            var generateResponse = await client.GetAsync($"{baseUrl}/api/insight/generate");
-            generateResponse.EnsureSuccessStatusCode();
-            var generateJson = await generateResponse.Content.ReadAsStringAsync();
-            var generateResult = System.Text.Json.JsonSerializer.Deserialize<System.Text.Json.JsonElement>(generateJson);
+            // Align to the Monday of the week containing startDate
+            var daysFromMonday = ((int)startDate.DayOfWeek + 6) % 7;
+            var weekCursor = startDate.AddDays(-daysFromMonday);
+
+            var researchWeeks = new List<object>();
+            while (weekCursor <= endDate)
+            {
+                var weekEnd = weekCursor.AddDays(6);
+                var weekStartStr = weekCursor.ToString("yyyy-MM-dd");
+                var weekEndStr   = weekEnd.ToString("yyyy-MM-dd");
+
+                logger.LogInformation("Knowledge pipeline: research week {WeekStart} to {WeekEnd}", weekStartStr, weekEndStr);
+                var researchResp = await client.GetAsync(
+                    $"{baseUrl}/api/market/research?from={weekStartStr}&to={weekEndStr}&markets={allMarkets}");
+                researchResp.EnsureSuccessStatusCode();
+                var researchResult = System.Text.Json.JsonSerializer.Deserialize<System.Text.Json.JsonElement>(
+                    await researchResp.Content.ReadAsStringAsync());
+                researchWeeks.Add(new { weekStart = weekStartStr, weekEnd = weekEndStr, result = researchResult });
+
+                weekCursor = weekCursor.AddDays(7);
+            }
+
+            // Step 4: Insight generation — iterate week by week over the date range, all 4 markets each week
+            weekCursor = startDate.AddDays(-daysFromMonday);
+            var insightWeeks = new List<object>();
+            while (weekCursor <= endDate)
+            {
+                var weekEnd = weekCursor.AddDays(6);
+                var weekStartStr = weekCursor.ToString("yyyy-MM-dd");
+                var weekEndStr   = weekEnd.ToString("yyyy-MM-dd");
+
+                logger.LogInformation("Knowledge pipeline: insight generation week {WeekStart} to {WeekEnd}", weekStartStr, weekEndStr);
+                var insightResp = await client.GetAsync(
+                    $"{baseUrl}/api/insight/generate?from={weekStartStr}&to={weekEndStr}&markets={allMarkets}");
+                insightResp.EnsureSuccessStatusCode();
+                var insightResult = System.Text.Json.JsonSerializer.Deserialize<System.Text.Json.JsonElement>(
+                    await insightResp.Content.ReadAsStringAsync());
+                insightWeeks.Add(new { weekStart = weekStartStr, weekEnd = weekEndStr, result = insightResult });
+
+                weekCursor = weekCursor.AddDays(7);
+            }
 
             return Results.Json(new
             {
                 success = true,
                 ingest = ingestResult,
                 analysis = analyzeResult,
-                research = researchResult,
-                insight = generateResult
+                researchWeeks,
+                insightWeeks
             });
         });
 

@@ -32,7 +32,9 @@ document.getElementById('knowledge-run-btn').onclick = async () => {
   const pre = document.getElementById('result');
   const btn = document.getElementById('knowledge-run-btn');
   btn.disabled = true;
-  pre.textContent = 'Running centralized pipeline... this may take a moment.';
+  const fromVal = fromInput.value || '2026-03-01';
+  const toVal   = toInput.value   || '2026-06-07';
+  pre.textContent = `Running knowledge pipeline (${fromVal} → ${toVal})...\nIterating week by week for all 4 markets (copper, gold, silver, oil).\nThis may take several minutes.`;
   try {
     const params = new URLSearchParams();
     if (fromInput.value) params.set('from', fromInput.value);

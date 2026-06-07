@@ -46,6 +46,10 @@ When calling store_news_article, provide a concise kebab-case description of the
         </div>
       </div>
       <div class="action-bar">
+        <label for="ingest-from">From:</label>
+        <input type="date" id="ingest-from" value="2026-06-01" />
+        <label for="ingest-to">To:</label>
+        <input type="date" id="ingest-to" value="2026-06-07" />
         <button class="action" id="ingest-btn">⬇ Ingest Now</button>
         <span id="ingest-spinner" class="spinner" hidden></span>
       </div>

@@ -21,10 +21,13 @@ public static class Apis
         BlobStorageService blobStorageService,
         FabricLakehouseService fabricLakehouseService)
     {
-        app.MapGet("/api/news/ingest", async () =>
+        app.MapGet("/api/news/ingest", async (string? from, string? to) =>
         {
             var before = await blobStorageService.ListBlobNamesAsync("news-store");
-            var result = await newsIngestionAgent.RunAsync("Ingest local articles-june.json and store each full article JSON object in news-store using {yyyyMMddHHmmssfff}_{guid}.json blob names.");
+            var dateRange = (!string.IsNullOrWhiteSpace(from) && !string.IsNullOrWhiteSpace(to))
+                ? $" Only include articles published between {from} and {to} (inclusive)."
+                : string.Empty;
+            var result = await newsIngestionAgent.RunAsync($"Ingest local articles-june.json and store each full article JSON object in news-store using {{yyyyMMddHHmmssfff}}_{{guid}}.json blob names.{dateRange}");
             var after = await blobStorageService.ListBlobNamesAsync("news-store");
 
             var delta = after.Count - before.Count;
@@ -45,14 +48,20 @@ public static class Apis
             return Results.Json(new { success = true, filenames });
         });
 
-        app.MapGet("/api/knowledge/run", async (HttpContext httpContext, IHttpClientFactory httpClientFactory) =>
+        app.MapGet("/api/knowledge/run", async (HttpContext httpContext, IHttpClientFactory httpClientFactory, string? from, string? to) =>
         {
             var baseUrl = $"{httpContext.Request.Scheme}://{httpContext.Request.Host}";
             var client = httpClientFactory.CreateClient();
             client.Timeout = TimeSpan.FromMinutes(10);
 
             // Step 1: Ingest (same as Ingest tab)
-            var ingestResponse = await client.GetAsync($"{baseUrl}/api/news/ingest");
+            var ingestParams = new System.Collections.Specialized.NameValueCollection();
+            if (!string.IsNullOrWhiteSpace(from)) ingestParams["from"] = from;
+            if (!string.IsNullOrWhiteSpace(to)) ingestParams["to"] = to;
+            var ingestQuery = ingestParams.Count > 0
+                ? "?" + string.Join("&", ingestParams.AllKeys.Select(k => $"{k}={Uri.EscapeDataString(ingestParams[k]!)}"))
+                : string.Empty;
+            var ingestResponse = await client.GetAsync($"{baseUrl}/api/news/ingest{ingestQuery}");
             ingestResponse.EnsureSuccessStatusCode();
             var ingestJson = await ingestResponse.Content.ReadAsStringAsync();
             var ingestResult = System.Text.Json.JsonSerializer.Deserialize<System.Text.Json.JsonElement>(ingestJson);

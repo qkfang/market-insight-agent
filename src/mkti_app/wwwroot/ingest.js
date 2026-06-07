@@ -1,5 +1,7 @@
 const btn = document.getElementById('ingest-btn');
 const spinner = document.getElementById('ingest-spinner');
+const fromInput = document.getElementById('ingest-from');
+const toInput = document.getElementById('ingest-to');
 const meta = document.getElementById('ingest-meta');
 const summary = document.getElementById('ingest-summary');
 const filesEl = document.getElementById('ingest-files');
@@ -33,7 +35,10 @@ btn.onclick = async () => {
   pre.textContent = 'Ingesting news...';
   pre.className = '';
   try {
-    const response = await fetch('/api/news/ingest');
+    const params = new URLSearchParams();
+    if (fromInput.value) params.set('from', fromInput.value);
+    if (toInput.value) params.set('to', toInput.value);
+    const response = await fetch(`/api/news/ingest?${params}`);
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
     const json = await response.json();
     const count = json.articlesStored ?? 0;

@@ -29,19 +29,22 @@ loadExisting();
 btn.onclick = async () => {
   btn.disabled = true;
   spinner.hidden = false;
-  summary.textContent = '';
+  summary.innerHTML = '';
   pre.textContent = 'Ingesting news...';
+  pre.className = '';
   try {
     const response = await fetch('/api/news/ingest');
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
     const json = await response.json();
     const count = json.articlesStored ?? 0;
-    summary.innerHTML = `<strong>${json.success ? 'Success' : 'Failed'}:</strong> ${count} article(s) stored.`;
-    meta.innerHTML = `<em>Last ingestion: ${new Date().toLocaleString()}</em>`;
+    summary.innerHTML = json.success
+      ? `<span class="status-badge success">✓ ${count} article(s) stored</span>`
+      : `<span class="status-badge error">Failed</span>`;
+    meta.innerHTML = `🕐 Last ingestion: ${new Date().toLocaleString()}`;
     renderFiles(json.filenames);
     pre.textContent = json.message || '';
   } catch (e) {
-    summary.innerHTML = `<strong>Error:</strong> ${escapeHtml(e.message)}`;
+    summary.innerHTML = `<span class="status-badge error">Error: ${escapeHtml(e.message)}</span>`;
     pre.textContent = `Error: ${e.message}`;
   } finally {
     btn.disabled = false;

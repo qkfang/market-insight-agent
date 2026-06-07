@@ -4,11 +4,26 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Knowledge Pipeline - Market Insight Agent</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="/style.css" />
 </head>
 <body>
-  <h1>Market Insight Agent</h1>
-  <nav class="tabs">
+  <header class="app-header">
+    <a class="app-header-logo" href="/index.html">
+      <div class="app-header-icon">📈</div>
+      <div>
+        <div class="app-header-title">Market Insight Agent</div>
+        <div class="app-header-subtitle">Copper Market Intelligence</div>
+      </div>
+    </a>
+    <div class="app-header-divider"></div>
+    <div class="app-header-meta">
+      <span class="app-header-badge"><span class="status-dot"></span> System Online</span>
+    </div>
+  </header>
+  <nav class="app-nav">
     <a href="/index.html">Overview</a>
     <a href="/knowledge.html" class="active">Knowledge</a>
     <a href="/ingest.html">News Ingestion</a>
@@ -18,12 +33,20 @@
     <a href="/subscription.html">Subscription</a>
     <a href="/delivery.html">Insight Delivery</a>
   </nav>
-  <section id="content" class="panel">
-    <h2>Knowledge</h2>
-    <p>Run the centralized pipeline on top articles: ingestion, analysis, market research, and insight generation.</p>
-    <button class="action" id="knowledge-run-btn">Run Knowledge Pipeline</button>
-    <pre id="result">Ready</pre>
-  </section>
+  <main class="app-main">
+    <div class="panel">
+      <div class="panel-header">
+        <div>
+          <h2 class="panel-title">Knowledge Pipeline</h2>
+          <p class="panel-desc">Run the centralized pipeline on top articles: ingestion, analysis, market research, and insight generation.</p>
+        </div>
+      </div>
+      <div class="action-bar">
+        <button class="action" id="knowledge-run-btn">▶ Run Knowledge Pipeline</button>
+      </div>
+      <pre id="result" class="ready-state">Ready — click Run Knowledge Pipeline to start.</pre>
+    </div>
+  </main>
   <script src="/common.js"></script>
   <script src="/knowledge.js"></script>
 </body>

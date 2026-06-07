@@ -4,11 +4,26 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>News Ingestion - Market Insight Agent</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="/style.css" />
 </head>
 <body>
-  <h1>Market Insight Agent</h1>
-  <nav class="tabs">
+  <header class="app-header">
+    <a class="app-header-logo" href="/index.html">
+      <div class="app-header-icon">📈</div>
+      <div>
+        <div class="app-header-title">Market Insight Agent</div>
+        <div class="app-header-subtitle">Copper Market Intelligence</div>
+      </div>
+    </a>
+    <div class="app-header-divider"></div>
+    <div class="app-header-meta">
+      <span class="app-header-badge"><span class="status-dot"></span> System Online</span>
+    </div>
+  </header>
+  <nav class="app-nav">
     <a href="/index.html">Overview</a>
     <a href="/knowledge.html">Knowledge</a>
     <a href="/ingest.html" class="active">News Ingestion</a>
@@ -18,21 +33,29 @@
     <a href="/subscription.html">Subscription</a>
     <a href="/delivery.html">Insight Delivery</a>
   </nav>
-  <section id="content" class="panel">
-    <h2>News Ingestion <span class="agent-hint"><a href="#">Agent Instructions</a><div class="agent-popup">You are a news ingestion agent for copper market. Download articles from RSS feeds and store each article as HTML in the news store. Track what has been stored to avoid duplicates.
+  <main class="app-main">
+    <div class="panel">
+      <div class="panel-header">
+        <div>
+          <h2 class="panel-title">News Ingestion <span class="agent-hint"><a href="#">Agent Instructions</a><div class="agent-popup">You are a news ingestion agent for copper market. Download articles from RSS feeds and store each article as HTML in the news store. Track what has been stored to avoid duplicates.
 
 Use the fetch_rss_feed tool to discover copper market articles, list_stored_news to check what is already stored, download_article to retrieve full HTML, and store_news_article to persist each new article.
 
 When calling store_news_article, provide a concise kebab-case description of the article as the 'description' parameter (e.g. 'copper-prices-surge-q2'). The tool will automatically prepend a millisecond timestamp prefix to form the final filename.</div></span></h2>
-    <p>Download the latest copper market news from RSS feeds and store articles in Fabric Datalake and Azure Blob Storage.</p>
-    <button class="action" id="ingest-btn">Ingest Now</button>
-    <span id="ingest-spinner" class="spinner" hidden></span>
-    <div id="ingest-meta"></div>
-    <div id="ingest-summary"></div>
-    <h3>Stored Articles</h3>
-    <ul id="ingest-files"><li>No articles loaded yet.</li></ul>
-    <pre id="result">Ready</pre>
-  </section>
+          <p class="panel-desc">Download the latest copper market news from RSS feeds and store articles in Fabric Datalake and Azure Blob Storage.</p>
+        </div>
+      </div>
+      <div class="action-bar">
+        <button class="action" id="ingest-btn">⬇ Ingest Now</button>
+        <span id="ingest-spinner" class="spinner" hidden></span>
+      </div>
+      <div id="ingest-meta"></div>
+      <div id="ingest-summary"></div>
+      <div class="section-heading">Stored Articles</div>
+      <ul id="ingest-files"><li>No articles loaded yet.</li></ul>
+      <pre id="result" class="ready-state">Ready — click Ingest Now to fetch articles.</pre>
+    </div>
+  </main>
   <script src="/common.js"></script>
   <script src="/ingest.js"></script>
 </body>

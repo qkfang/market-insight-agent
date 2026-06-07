@@ -4,11 +4,26 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Subscription - Market Insight Agent</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="/style.css" />
 </head>
 <body>
-  <h1>Market Insight Agent</h1>
-  <nav class="tabs">
+  <header class="app-header">
+    <a class="app-header-logo" href="/index.html">
+      <div class="app-header-icon">📈</div>
+      <div>
+        <div class="app-header-title">Market Insight Agent</div>
+        <div class="app-header-subtitle">Copper Market Intelligence</div>
+      </div>
+    </a>
+    <div class="app-header-divider"></div>
+    <div class="app-header-meta">
+      <span class="app-header-badge"><span class="status-dot"></span> System Online</span>
+    </div>
+  </header>
+  <nav class="app-nav">
     <a href="/index.html">Overview</a>
     <a href="/knowledge.html">Knowledge</a>
     <a href="/ingest.html">News Ingestion</a>
@@ -18,24 +33,33 @@
     <a href="/subscription.html" class="active">Subscription</a>
     <a href="/delivery.html">Insight Delivery</a>
   </nav>
-  <section id="content" class="panel">
-    <h2>Insight Subscription</h2>
-    <div>
-      <strong>Markets</strong>
-      <label><input type="checkbox" name="market" value="Copper"> Copper</label>
-      <label><input type="checkbox" name="market" value="Gold"> Gold</label>
-      <label><input type="checkbox" name="market" value="Silver"> Silver</label>
-      <label><input type="checkbox" name="market" value="Aluminum"> Aluminum</label>
+  <main class="app-main">
+    <div class="panel">
+      <div class="panel-header">
+        <div>
+          <h2 class="panel-title">Insight Subscription</h2>
+          <p class="panel-desc">Configure which markets and report types you want to receive alerts and daily reports for.</p>
+        </div>
+      </div>
+      <div class="subscription-section">
+        <strong>Markets</strong>
+        <label><input type="checkbox" name="market" value="Copper"> Copper</label>
+        <label><input type="checkbox" name="market" value="Gold"> Gold</label>
+        <label><input type="checkbox" name="market" value="Silver"> Silver</label>
+        <label><input type="checkbox" name="market" value="Aluminum"> Aluminum</label>
+      </div>
+      <div class="subscription-section">
+        <strong>Report Types</strong>
+        <label><input type="checkbox" name="item" value="Daily Report"> Daily Report</label>
+        <label><input type="checkbox" name="item" value="Sentiment Alert"> Sentiment Alert</label>
+        <label><input type="checkbox" name="item" value="Price Alert"> Price Alert</label>
+      </div>
+      <div class="action-bar">
+        <button class="action" id="subscription-save">💾 Save Preferences</button>
+      </div>
+      <pre id="result" class="ready-state">Ready — adjust preferences and click Save.</pre>
     </div>
-    <div>
-      <strong>Items</strong>
-      <label><input type="checkbox" name="item" value="Daily Report"> Daily Report</label>
-      <label><input type="checkbox" name="item" value="Sentiment Alert"> Sentiment Alert</label>
-      <label><input type="checkbox" name="item" value="Price Alert"> Price Alert</label>
-    </div>
-    <button class="action" id="subscription-save">Save Preferences</button>
-    <pre id="result">Ready</pre>
-  </section>
+  </main>
   <script src="/common.js"></script>
   <script src="/subscription.js"></script>
 </body>

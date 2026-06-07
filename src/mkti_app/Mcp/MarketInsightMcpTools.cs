@@ -1,7 +1,9 @@
 using System.ComponentModel;
 using System.Globalization;
+using System.Net;
 using System.Net.Http.Headers;
 using System.Text.Json;
+using System.Text.RegularExpressions;
 using System.Xml.Linq;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.Configuration;
@@ -272,10 +274,11 @@ public sealed class MarketInsightMcpTools
             var source = TryGetString(article, "source")
                 ?? TryGetString(article, "domain")
                 ?? string.Empty;
-            var rawHtml = TryGetString(article, "htmlContent")
-                ?? TryGetString(article, "description")
-                ?? string.Empty;
-            var markdownContent = StripHtmlToText(rawHtml);
+            var textContent = TryGetString(article, "textContent");
+            var isPlaceholder = textContent?.StartsWith("{extracted", StringComparison.OrdinalIgnoreCase) == true;
+            var markdownContent = (!string.IsNullOrWhiteSpace(textContent) && !isPlaceholder)
+                ? textContent
+                : StripHtmlToText(TryGetString(article, "htmlContent") ?? TryGetString(article, "description") ?? string.Empty);
             var wordCount = markdownContent
                 .Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries)
                 .Length;
@@ -293,6 +296,87 @@ public sealed class MarketInsightMcpTools
             processedCount = stored.Count,
             skippedCount = skipped.Count,
             filenames = stored,
+            skipped
+        }, JsonOptions);
+    }
+
+    [McpServerTool(Name = "extract_html_to_text_content"), Description("For each news article JSON in the news-store container, convert the htmlContent field to markdown and populate the textContent field in-place. Skips articles whose textContent is already populated. Returns JSON with updatedCount, skippedCount, filenames and skipped.")]
+    public async Task<string> ExtractHtmlToTextContent()
+    {
+        var names = await _blobStorageService.ListBlobNamesAsync(NewsStoreContainer);
+        var updated = new List<string>();
+        var skipped = new List<object>();
+
+        foreach (var blobName in names)
+        {
+            var content = await _blobStorageService.ReadTextAsync(NewsStoreContainer, blobName);
+            if (string.IsNullOrWhiteSpace(content))
+            {
+                skipped.Add(new { blobName, reason = "empty content" });
+                continue;
+            }
+
+            JsonElement article;
+            try
+            {
+                using var articleDoc = JsonDocument.Parse(content);
+                article = articleDoc.RootElement.Clone();
+            }
+            catch (JsonException ex)
+            {
+                skipped.Add(new { blobName, reason = $"invalid JSON: {ex.Message}" });
+                continue;
+            }
+
+            var htmlContent = TryGetString(article, "htmlContent") ?? string.Empty;
+            if (string.IsNullOrWhiteSpace(htmlContent))
+            {
+                skipped.Add(new { blobName, reason = "no htmlContent" });
+                continue;
+            }
+
+            var existingText = TryGetString(article, "textContent");
+            if (!string.IsNullOrWhiteSpace(existingText)
+                && !existingText.StartsWith("{extracted", StringComparison.OrdinalIgnoreCase))
+            {
+                skipped.Add(new { blobName, reason = "textContent already populated" });
+                continue;
+            }
+
+            var markdownText = HtmlToMarkdown(htmlContent);
+
+            using var ms = new MemoryStream();
+            using var writer = new Utf8JsonWriter(ms);
+            writer.WriteStartObject();
+            var textContentWritten = false;
+            foreach (var prop in article.EnumerateObject())
+            {
+                if (prop.NameEquals("textContent"))
+                {
+                    writer.WriteString("textContent", markdownText);
+                    textContentWritten = true;
+                }
+                else
+                {
+                    prop.WriteTo(writer);
+                }
+            }
+            if (!textContentWritten)
+                writer.WriteString("textContent", markdownText);
+            writer.WriteEndObject();
+            writer.Flush();
+
+            var updatedJson = System.Text.Encoding.UTF8.GetString(ms.ToArray());
+            await _blobStorageService.WriteTextAsync(NewsStoreContainer, blobName, updatedJson, "application/json");
+            await _fabricLakehouseService.WriteFileAsync($"news-store/{blobName}", updatedJson);
+            updated.Add(blobName);
+        }
+
+        return JsonSerializer.Serialize(new
+        {
+            updatedCount = updated.Count,
+            skippedCount = skipped.Count,
+            filenames = updated,
             skipped
         }, JsonOptions);
     }
@@ -776,6 +860,150 @@ public sealed class MarketInsightMcpTools
             content = content ?? string.Empty,
             filename = content is null ? string.Empty : filename
         }, JsonOptions);
+    }
+
+    [McpServerTool(Name = "enrich_articles_html"), Description("For each article in a local articles JSON file, download the full HTML page from originalUrl and replace the htmlContent field. Saves the updated file in place. Returns a summary of enriched and skipped articles.")]
+    public async Task<string> EnrichArticlesHtml(
+        [Description("Optional JSON filename under the app data folder, e.g. articles-june.json. Defaults to latest articles-*.json, then articles.json.")] string? fileName = null)
+    {
+        var resolvedPath = ResolveArticlesFilePath(fileName);
+        if (resolvedPath is null)
+            return "Error: no articles JSON file found in the data folder.";
+
+        var payload = await File.ReadAllTextAsync(resolvedPath);
+        JsonDocument doc;
+        try
+        {
+            doc = JsonDocument.Parse(payload);
+        }
+        catch (JsonException ex)
+        {
+            return $"Error: invalid JSON in '{Path.GetFileName(resolvedPath)}': {ex.Message}";
+        }
+
+        using (doc)
+        {
+            if (doc.RootElement.ValueKind != JsonValueKind.Array)
+                return $"Error: '{Path.GetFileName(resolvedPath)}' must contain a JSON array of article objects.";
+
+            var client = CreateClient();
+            var enriched = new List<string>();
+            var skipped = new List<object>();
+            var updatedArticles = new List<JsonElement>();
+
+            foreach (var article in doc.RootElement.EnumerateArray())
+            {
+                var id = TryGetString(article, "id") ?? "(unknown)";
+                var url = TryGetString(article, "originalUrl");
+                var title = TryGetString(article, "title") ?? id;
+
+                if (string.IsNullOrWhiteSpace(url))
+                {
+                    skipped.Add(new { id, title, reason = "no originalUrl" });
+                    updatedArticles.Add(article.Clone());
+                    continue;
+                }
+
+                string html;
+                try
+                {
+                    html = await client.GetStringAsync(url);
+                }
+                catch (Exception ex)
+                {
+                    skipped.Add(new { id, title, reason = $"download failed: {ex.Message}" });
+                    updatedArticles.Add(article.Clone());
+                    continue;
+                }
+
+                using var ms = new System.IO.MemoryStream();
+                using var writer = new System.Text.Json.Utf8JsonWriter(ms);
+                writer.WriteStartObject();
+                foreach (var prop in article.EnumerateObject())
+                {
+                    if (prop.NameEquals("htmlContent"))
+                        writer.WriteString("htmlContent", html);
+                    else
+                        prop.WriteTo(writer);
+                }
+                writer.WriteEndObject();
+                writer.Flush();
+
+                using var updatedDoc = JsonDocument.Parse(ms.ToArray());
+                updatedArticles.Add(updatedDoc.RootElement.Clone());
+                enriched.Add(title);
+            }
+
+            var outputJson = JsonSerializer.Serialize(updatedArticles, new JsonSerializerOptions { WriteIndented = true });
+            await File.WriteAllTextAsync(resolvedPath, outputJson);
+
+            return JsonSerializer.Serialize(new
+            {
+                sourceFile = Path.GetFileName(resolvedPath),
+                enrichedCount = enriched.Count,
+                skippedCount = skipped.Count,
+                enriched,
+                skipped
+            }, JsonOptions);
+        }
+    }
+
+    private static string HtmlToMarkdown(string html)
+    {
+        if (string.IsNullOrWhiteSpace(html))
+            return string.Empty;
+
+        // Remove script and style blocks entirely
+        var result = Regex.Replace(html, @"<(script|style)\b[^>]*>[\s\S]*?</(script|style)>", string.Empty, RegexOptions.IgnoreCase);
+
+        // Convert headings
+        result = Regex.Replace(result, @"<h1\b[^>]*>([\s\S]*?)</h1>", m => $"\n# {StripTags(m.Groups[1].Value).Trim()}\n\n", RegexOptions.IgnoreCase);
+        result = Regex.Replace(result, @"<h2\b[^>]*>([\s\S]*?)</h2>", m => $"\n## {StripTags(m.Groups[1].Value).Trim()}\n\n", RegexOptions.IgnoreCase);
+        result = Regex.Replace(result, @"<h3\b[^>]*>([\s\S]*?)</h3>", m => $"\n### {StripTags(m.Groups[1].Value).Trim()}\n\n", RegexOptions.IgnoreCase);
+        result = Regex.Replace(result, @"<h[4-6]\b[^>]*>([\s\S]*?)</h[4-6]>", m => $"\n#### {StripTags(m.Groups[1].Value).Trim()}\n\n", RegexOptions.IgnoreCase);
+
+        // Convert bold/strong
+        result = Regex.Replace(result, @"<(?:b|strong)\b[^>]*>([\s\S]*?)</(?:b|strong)>", m => $"**{StripTags(m.Groups[1].Value).Trim()}**", RegexOptions.IgnoreCase);
+
+        // Convert italic/em
+        result = Regex.Replace(result, @"<(?:i|em)\b[^>]*>([\s\S]*?)</(?:i|em)>", m => $"*{StripTags(m.Groups[1].Value).Trim()}*", RegexOptions.IgnoreCase);
+
+        // Convert links
+        result = Regex.Replace(result, @"<a\b[^>]+href=[""']([^""']*)[""'][^>]*>([\s\S]*?)</a>", m => $"[{StripTags(m.Groups[2].Value).Trim()}]({m.Groups[1].Value})", RegexOptions.IgnoreCase);
+
+        // Convert list items
+        result = Regex.Replace(result, @"<li\b[^>]*>([\s\S]*?)</li>", m => $"\n- {StripTags(m.Groups[1].Value).Trim()}", RegexOptions.IgnoreCase);
+
+        // Convert paragraphs
+        result = Regex.Replace(result, @"<p\b[^>]*>([\s\S]*?)</p>", m =>
+        {
+            var text = StripTags(m.Groups[1].Value).Trim();
+            return string.IsNullOrWhiteSpace(text) ? "\n" : $"\n{text}\n";
+        }, RegexOptions.IgnoreCase);
+
+        // Convert line breaks
+        result = Regex.Replace(result, @"<br\s*/?>", "\n", RegexOptions.IgnoreCase);
+
+        // Block structural elements → newlines
+        result = Regex.Replace(result, @"</?(div|section|article|main|header|footer|nav|aside|figure|figcaption)\b[^>]*>", "\n", RegexOptions.IgnoreCase);
+
+        // Remove remaining HTML tags
+        result = StripTags(result);
+
+        // Decode HTML entities
+        result = WebUtility.HtmlDecode(result);
+
+        // Collapse 3+ consecutive newlines to 2
+        result = Regex.Replace(result, @"\n{3,}", "\n\n");
+
+        return result.Trim();
+    }
+
+    private static string StripTags(string html)
+    {
+        if (string.IsNullOrWhiteSpace(html))
+            return string.Empty;
+        return Regex.Replace(html, @"<[^>]+>", string.Empty);
     }
 
     private static string StripHtmlToText(string html)

@@ -25,12 +25,12 @@
   </header>
   <nav class="app-nav">
     <a href="/index.html">Overview</a>
-    <a href="/knowledge.html">Knowledge</a>
     <a href="/ingest.html">News Ingestion</a>
     <a href="/analyze.html">News Analysis</a>
     <a href="/research.html">Market Research</a>
     <a href="/generate.html" class="active">Insight Generation</a>
     <a href="/subscription.html">Subscription</a>
+    <a href="/knowledge.html">Knowledge</a>
   </nav>
   <main class="app-main">
     <div class="panel">
@@ -55,9 +55,9 @@
         <span id="generate-spinner" class="spinner" hidden></span>
       </div>
       <div id="generate-result"></div>
-      <div class="section-heading" style="display:flex;align-items:center;gap:10px;">
-        Generated Insights
-        <button class="action" id="generate-refresh-btn" style="padding:2px 10px;font-size:12px;">↻ Refresh List</button>
+      <div class="section-heading">Generated Insights</div>
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;">
+        <button class="action" id="generate-refresh-btn">↻ Refresh List</button>
         <span id="generate-cache-time" style="font-size:11px;color:var(--color-text-muted);"></span>
       </div>
       <div id="generate-table"></div>

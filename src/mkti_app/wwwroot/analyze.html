@@ -50,8 +50,12 @@ Do not use Document Intelligence and do not convert HTML manually; the tool hand
         <button class="action" id="analyze-btn">🔍 Analyze Articles</button>
       </div>
       <pre id="result" class="ready-state">Ready — click Analyze Articles to process.</pre>
-      <div class="section-heading">Analyzed Articles</div>
-      <div id="analysis-table"></div>
+      <div class="section-heading" style="display:flex;align-items:center;gap:10px;">
+        Analyzed Articles
+        <button class="action" id="analyze-refresh-btn" style="padding:2px 10px;font-size:12px;">↻ Refresh List</button>
+        <span id="analyze-cache-time" style="font-size:11px;color:var(--color-text-muted);"></span>
+      </div>
+      <div id="analysis-table"><p>Loading from cache…</p></div>
     </div>
   </main>
   <script src="/common.js"></script>

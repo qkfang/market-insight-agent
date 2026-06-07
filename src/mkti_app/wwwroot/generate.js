@@ -56,7 +56,7 @@ btn.onclick = async () => {
     const json = await response.json();
     if (json.status === 'error') throw new Error(json.error || 'Generation failed.');
     renderResult(json);
-    await loadGenerateTable();
+    await refreshGenerateCache();
   } catch (e) {
     resultEl.innerHTML = `<p class="research-error">Error: ${escapeHtml(e.message)}</p>`;
   } finally {
@@ -101,17 +101,39 @@ function renderGenerateTable(reports) {
   });
 }
 
+const refreshGenBtn = document.getElementById('generate-refresh-btn');
+const genCacheTimeEl = document.getElementById('generate-cache-time');
+
 async function loadGenerateTable() {
   const tableEl = document.getElementById('generate-table');
-  if (tableEl) tableEl.innerHTML = '<p>Loading generated insights...</p>';
   try {
-    const response = await fetch('/api/insight/list');
-    if (!response.ok) throw new Error(`HTTP ${response.status}`);
-    const data = await response.json();
+    const r = await fetch('/temp/cache-generate.json');
+    if (!r.ok) throw new Error('no cache');
+    const data = await r.json();
+    if (data.cachedAt && genCacheTimeEl) genCacheTimeEl.textContent = `cached ${new Date(data.cachedAt).toLocaleString()}`;
     renderGenerateTable(data.reports || []);
-  } catch (e) {
-    if (tableEl) tableEl.innerHTML = `Error: ${escapeHtml(e.message)}`;
+  } catch {
+    if (tableEl) tableEl.innerHTML = '<p style="color:var(--color-text-muted)">No cache yet — click ↻ Refresh List to load.</p>';
   }
 }
+
+async function refreshGenerateCache() {
+  if (refreshGenBtn) refreshGenBtn.disabled = true;
+  const tableEl = document.getElementById('generate-table');
+  if (tableEl) tableEl.innerHTML = '<p>Refreshing…</p>';
+  try {
+    const r = await fetch('/api/cache/refresh/generate', { method: 'POST' });
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    const data = await r.json();
+    if (genCacheTimeEl) genCacheTimeEl.textContent = `refreshed ${new Date().toLocaleString()}`;
+    renderGenerateTable(data.reports || []);
+  } catch (e) {
+    if (tableEl) tableEl.innerHTML = `<p style="color:var(--color-text-muted)">Refresh failed: ${escapeHtml(e.message)}</p>`;
+  } finally {
+    if (refreshGenBtn) refreshGenBtn.disabled = false;
+  }
+}
+
+if (refreshGenBtn) refreshGenBtn.onclick = refreshGenerateCache;
 
 loadGenerateTable();

@@ -565,6 +565,108 @@ public static class Apis
 
             return Results.Content(content, "text/html; charset=utf-8");
         });
+
+        // ── Blob-list cache refresh ──────────────────────────────────────────
+        app.MapPost("/api/cache/refresh/{type}", async (string type, IWebHostEnvironment env) =>
+        {
+            var validTypes = new[] { "ingest", "analyze", "research", "generate" };
+            if (!validTypes.Contains(type))
+                return Results.BadRequest("Unknown cache type.");
+
+            var webRoot = env.WebRootPath;
+            if (string.IsNullOrWhiteSpace(webRoot))
+                webRoot = Path.Combine(env.ContentRootPath, "wwwroot");
+            var tempDir = Path.Combine(webRoot, "temp");
+            Directory.CreateDirectory(tempDir);
+            var cacheFile = Path.Combine(tempDir, $"cache-{type}.json");
+
+            object payload;
+
+            if (type == "ingest")
+            {
+                var articlesDir = Path.Combine(env.ContentRootPath, DataFolderName, ArticlesFolderName);
+                string[] filenames = [];
+                if (Directory.Exists(articlesDir))
+                {
+                    filenames = Directory.GetFiles(articlesDir, "*.json", SearchOption.TopDirectoryOnly)
+                        .OrderBy(f => f)
+                        .Select(Path.GetFileName)
+                        .OfType<string>()
+                        .ToArray();
+                }
+                payload = new { filenames };
+            }
+            else if (type == "analyze")
+            {
+                var names = await blobStorageService.ListBlobNamesAsync("news-analysis");
+                var articles = new List<object>();
+                foreach (var name in names)
+                {
+                    var content = await blobStorageService.ReadTextAsync("news-analysis", name);
+                    string? title = null, date = null, source = null;
+                    int? wordCount = null;
+                    if (!string.IsNullOrWhiteSpace(content))
+                    {
+                        try
+                        {
+                            using var doc = System.Text.Json.JsonDocument.Parse(content);
+                            var root = doc.RootElement;
+                            if (root.TryGetProperty("title", out var t)) title = t.GetString();
+                            if (root.TryGetProperty("date", out var d)) date = d.GetString();
+                            else if (root.TryGetProperty("publishDateIso", out var di)) date = di.GetString();
+                            else if (root.TryGetProperty("publishDate", out var dp)) date = dp.GetString();
+                            if (root.TryGetProperty("source", out var s)) source = s.GetString();
+                            else if (root.TryGetProperty("domain", out var dom)) source = dom.GetString();
+                            if (root.TryGetProperty("wordCount", out var w) && w.TryGetInt32(out var wc)) wordCount = wc;
+                            else if (root.TryGetProperty("textContent", out var tc) && tc.GetString() is { } tcStr)
+                                wordCount = tcStr.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries).Length;
+                        }
+                        catch { /* skip malformed blobs */ }
+                    }
+                    articles.Add(new { filename = name, title, date, source, wordCount });
+                }
+                payload = new { status = "ok", articles, cachedAt = DateTime.UtcNow.ToString("o") };
+            }
+            else if (type == "research")
+            {
+                var names = await blobStorageService.ListBlobNamesAsync("market-research");
+                var reports = names
+                    .OrderByDescending(n => n, StringComparer.Ordinal)
+                    .Select(n =>
+                    {
+                        var stem = Path.GetFileNameWithoutExtension(n);
+                        string? weekStart = null, market = null;
+                        var suffixIdx = stem.LastIndexOf("_research", StringComparison.OrdinalIgnoreCase);
+                        if (suffixIdx > 10)
+                        {
+                            weekStart = stem[..10];
+                            market = stem[(stem[..10].Length + 1)..suffixIdx];
+                        }
+                        return new { filename = n, weekStart, market };
+                    })
+                    .ToArray();
+                payload = new { reports, cachedAt = DateTime.UtcNow.ToString("o") };
+            }
+            else // generate
+            {
+                var names = await blobStorageService.ListBlobNamesAsync("market-insight");
+                var reports = names
+                    .OrderByDescending(n => n, StringComparer.Ordinal)
+                    .Select(n => new
+                    {
+                        filename = n,
+                        date = ExtractInsightDate(n),
+                        market = ExtractInsightMarket(n)
+                    })
+                    .ToArray();
+                payload = new { reports, cachedAt = DateTime.UtcNow.ToString("o") };
+            }
+
+            var json = System.Text.Json.JsonSerializer.Serialize(payload, new System.Text.Json.JsonSerializerOptions { WriteIndented = false });
+            await File.WriteAllTextAsync(cacheFile, json, System.Text.Encoding.UTF8);
+
+            return Results.Json(payload);
+        });
     }
 
     private static string ResolveUserId(HttpContext context)

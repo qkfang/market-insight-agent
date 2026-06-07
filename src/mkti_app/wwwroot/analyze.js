@@ -34,18 +34,40 @@ function renderAnalysisTable(articles) {
   });
 }
 
+const refreshBtn = document.getElementById('analyze-refresh-btn');
+const cacheTimeEl = document.getElementById('analyze-cache-time');
+
 async function loadAnalysisTable() {
   const tableEl = document.getElementById('analysis-table');
-  if (tableEl) tableEl.innerHTML = '<p>Loading analyzed articles...</p>';
   try {
-    const response = await fetch('/api/news/analysis');
-    if (!response.ok) throw new Error(`HTTP ${response.status}`);
-    const data = await response.json();
+    const r = await fetch('/temp/cache-analyze.json');
+    if (!r.ok) throw new Error('no cache');
+    const data = await r.json();
+    if (data.cachedAt && cacheTimeEl) cacheTimeEl.textContent = `cached ${new Date(data.cachedAt).toLocaleString()}`;
     renderAnalysisTable(data.articles || []);
-  } catch (e) {
-    if (tableEl) tableEl.innerHTML = `Error: ${escapeHtml(e.message)}`;
+  } catch {
+    if (tableEl) tableEl.innerHTML = '<p style="color:var(--color-text-muted)">No cache yet — click ↻ Refresh List to load.</p>';
   }
 }
+
+async function refreshAnalysisCache() {
+  if (refreshBtn) refreshBtn.disabled = true;
+  const tableEl = document.getElementById('analysis-table');
+  if (tableEl) tableEl.innerHTML = '<p>Refreshing from blob storage… this may take a moment.</p>';
+  try {
+    const r = await fetch('/api/cache/refresh/analyze', { method: 'POST' });
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    const data = await r.json();
+    if (cacheTimeEl) cacheTimeEl.textContent = `refreshed ${new Date().toLocaleString()}`;
+    renderAnalysisTable(data.articles || []);
+  } catch (e) {
+    if (tableEl) tableEl.innerHTML = `<p style="color:var(--color-text-muted)">Refresh failed: ${escapeHtml(e.message)}</p>`;
+  } finally {
+    if (refreshBtn) refreshBtn.disabled = false;
+  }
+}
+
+if (refreshBtn) refreshBtn.onclick = refreshAnalysisCache;
 
 document.getElementById('analyze-btn').onclick = async () => {
   const pre = document.getElementById('result');
@@ -57,7 +79,7 @@ document.getElementById('analyze-btn').onclick = async () => {
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
     const json = await response.json();
     pre.textContent = JSON.stringify(json, null, 2);
-    await loadAnalysisTable();
+    await refreshAnalysisCache();
   } catch (e) {
     pre.textContent = `Error: ${e.message}`;
   } finally {

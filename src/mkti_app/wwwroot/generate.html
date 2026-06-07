@@ -55,7 +55,11 @@
         <span id="generate-spinner" class="spinner" hidden></span>
       </div>
       <div id="generate-result"></div>
-      <div class="section-heading">Generated Insights</div>
+      <div class="section-heading" style="display:flex;align-items:center;gap:10px;">
+        Generated Insights
+        <button class="action" id="generate-refresh-btn" style="padding:2px 10px;font-size:12px;">↻ Refresh List</button>
+        <span id="generate-cache-time" style="font-size:11px;color:var(--color-text-muted);"></span>
+      </div>
       <div id="generate-table"></div>
     </div>
   </main>

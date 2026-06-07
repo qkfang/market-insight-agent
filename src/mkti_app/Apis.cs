@@ -92,7 +92,7 @@ public static class Apis
                 StringComparer.OrdinalIgnoreCase);
 
             var result = await newsAnalysisAgent.RunAsync(
-                "Analyze all unprocessed news articles and extract structured content.");
+                "Analyze all unprocessed news-store JSON articles and store structured analysis in news-analysis using {yyyyMMddHHmmssfff}_{guid}.json blob names.");
 
             var afterNames = await blobStorageService.ListBlobNamesAsync("news-analysis");
             var results = new List<object>();

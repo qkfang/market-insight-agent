@@ -211,7 +211,7 @@ public sealed class MarketInsightMcpTools
         return $"Stored news as {blobName}";
     }
 
-    [McpServerTool(Name = "list_unprocessed_news"), Description("List raw news articles in the news-store container that have not yet been analyzed (no matching JSON in news-analysis). Returns JSON array of { filename, blobUrl }.")]
+    [McpServerTool(Name = "list_unprocessed_news"), Description("List raw news articles in the news-store container that have not yet been analyzed (no matching entry in news-analysis). Returns JSON array of { filename, blobUrl }.")]
     public async Task<string> ListUnprocessedNews()
     {
         var sourceNames = await _blobStorageService.ListBlobNamesAsync(NewsStoreContainer);
@@ -219,7 +219,7 @@ public sealed class MarketInsightMcpTools
         var analyzedSet = new HashSet<string>(analyzedNames, StringComparer.OrdinalIgnoreCase);
 
         var unprocessed = sourceNames
-            .Where(name => !analyzedSet.Contains($"{name}.json"))
+            .Where(name => !analyzedSet.Contains(name) && !analyzedSet.Contains($"{name}.json"))
             .Select(name => new
             {
                 filename = name,
@@ -228,6 +228,73 @@ public sealed class MarketInsightMcpTools
             .ToArray();
 
         return JsonSerializer.Serialize(unprocessed, JsonOptions);
+    }
+
+    [McpServerTool(Name = "analyze_news_json_to_analysis"), Description("Read unprocessed news JSON articles from the news-store container, extract structured fields, and store analysis JSON in news-analysis. Blob name matches the source: {yyyyMMddHHmmssfff}_{guid}.json. Returns JSON with processedCount, skippedCount, filenames and skipped.")]
+    public async Task<string> AnalyzeNewsJsonToAnalysis()
+    {
+        var sourceNames = await _blobStorageService.ListBlobNamesAsync(NewsStoreContainer);
+        var analyzedNames = await _blobStorageService.ListBlobNamesAsync(NewsAnalysisContainer);
+        var analyzedSet = new HashSet<string>(analyzedNames, StringComparer.OrdinalIgnoreCase);
+
+        var unprocessed = sourceNames
+            .Where(name => !analyzedSet.Contains(name) && !analyzedSet.Contains($"{name}.json"))
+            .ToList();
+
+        var stored = new List<string>();
+        var skipped = new List<object>();
+
+        foreach (var blobName in unprocessed)
+        {
+            var content = await _blobStorageService.ReadTextAsync(NewsStoreContainer, blobName);
+            if (string.IsNullOrWhiteSpace(content))
+            {
+                skipped.Add(new { blobName, reason = "empty content" });
+                continue;
+            }
+
+            JsonElement article;
+            try
+            {
+                using var articleDoc = JsonDocument.Parse(content);
+                article = articleDoc.RootElement.Clone();
+            }
+            catch (JsonException ex)
+            {
+                skipped.Add(new { blobName, reason = $"invalid JSON: {ex.Message}" });
+                continue;
+            }
+
+            var title = TryGetString(article, "title") ?? Path.GetFileNameWithoutExtension(blobName);
+            var date = TryGetString(article, "publishDateIso")
+                ?? TryGetString(article, "publishDate")
+                ?? DateTimeOffset.UtcNow.ToString("yyyy-MM-dd");
+            var source = TryGetString(article, "source")
+                ?? TryGetString(article, "domain")
+                ?? string.Empty;
+            var rawHtml = TryGetString(article, "htmlContent")
+                ?? TryGetString(article, "description")
+                ?? string.Empty;
+            var markdownContent = StripHtmlToText(rawHtml);
+            var wordCount = markdownContent
+                .Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries)
+                .Length;
+
+            var analysisJson = JsonSerializer.Serialize(
+                new { title, date, source, markdownContent, wordCount }, JsonOptions);
+
+            await _blobStorageService.WriteTextAsync(NewsAnalysisContainer, blobName, analysisJson, "application/json");
+            await _fabricLakehouseService.WriteFileAsync($"news-analysis/{blobName}", analysisJson);
+            stored.Add(blobName);
+        }
+
+        return JsonSerializer.Serialize(new
+        {
+            processedCount = stored.Count,
+            skippedCount = skipped.Count,
+            filenames = stored,
+            skipped
+        }, JsonOptions);
     }
 
     [McpServerTool(Name = "parse_article_with_doc_intelligence"), Description("Retrieve a raw news article from the news-store container (blob or local fallback) and use Azure Document Intelligence (prebuilt-read) to extract its content as markdown. Returns JSON { title, date, source, markdownContent, wordCount }.")]
@@ -533,6 +600,26 @@ public sealed class MarketInsightMcpTools
             content = content ?? string.Empty,
             filename = content is null ? string.Empty : filename
         }, JsonOptions);
+    }
+
+    private static string StripHtmlToText(string html)
+    {
+        if (string.IsNullOrWhiteSpace(html))
+            return string.Empty;
+
+        var sb = new System.Text.StringBuilder(html.Length);
+        var inTag = false;
+        foreach (var ch in html)
+        {
+            if (ch == '<') { inTag = true; continue; }
+            if (ch == '>') { inTag = false; continue; }
+            if (!inTag) sb.Append(ch);
+        }
+
+        // Collapse runs of whitespace to single spaces and trim.
+        var raw = sb.ToString();
+        var parts = raw.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries);
+        return string.Join(' ', parts);
     }
 
     private static bool LooksLikeJsonObject(string content)

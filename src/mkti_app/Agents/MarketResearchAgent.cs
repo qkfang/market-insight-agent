@@ -22,18 +22,20 @@ public sealed class MarketResearchAgent : BaseAgent
           "summary": "...",
           "newsAnalysisArticles": [
             {
-              "filename": "...",
               "title": "...",
               "date": "...",
-              "source": "...",
+              "snippet": "...",
+              "sourceUrl": "...",
+              "blobfilename": "...",
               "reasoningSummary": "one or two sentences explaining how this article supports the overall sentiment"
             }
           ],
           "bingNews": [
             {
               "title": "...",
+              "date": "...",
               "snippet": "...",
-              "url": "...",
+              "sourceUrl": "...",
               "reasoningSummary": "one or two sentences explaining how this news item supports the overall sentiment"
             }
           ]

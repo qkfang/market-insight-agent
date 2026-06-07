@@ -162,8 +162,13 @@ public static class Apis
                     var root = doc.RootElement;
                     if (root.TryGetProperty("title", out var t)) title = t.GetString();
                     if (root.TryGetProperty("date", out var d)) date = d.GetString();
+                    else if (root.TryGetProperty("publishDateIso", out var di)) date = di.GetString();
+                    else if (root.TryGetProperty("publishDate", out var dp)) date = dp.GetString();
                     if (root.TryGetProperty("source", out var s)) source = s.GetString();
+                    else if (root.TryGetProperty("domain", out var dom)) source = dom.GetString();
                     if (root.TryGetProperty("wordCount", out var w) && w.TryGetInt32(out var wc)) wordCount = wc;
+                    else if (root.TryGetProperty("textContent", out var tc) && tc.GetString() is { } tcStr)
+                        wordCount = tcStr.Split((char[]?)null, System.StringSplitOptions.RemoveEmptyEntries).Length;
                 }
                 articles.Add(new { filename = name, title, date, source, wordCount });
             }

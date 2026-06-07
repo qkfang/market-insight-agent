@@ -274,11 +274,10 @@ public sealed class MarketInsightMcpTools
                 continue;
             }
 
-            JsonElement article;
             try
             {
                 using var articleDoc = JsonDocument.Parse(content);
-                article = articleDoc.RootElement.Clone();
+                _ = articleDoc.RootElement; // validate JSON
             }
             catch (JsonException ex)
             {
@@ -286,24 +285,7 @@ public sealed class MarketInsightMcpTools
                 continue;
             }
 
-            var title = TryGetString(article, "title") ?? Path.GetFileNameWithoutExtension(blobName);
-            var date = TryGetString(article, "publishDateIso")
-                ?? TryGetString(article, "publishDate")
-                ?? DateTimeOffset.UtcNow.ToString("yyyy-MM-dd");
-            var source = TryGetString(article, "source")
-                ?? TryGetString(article, "domain")
-                ?? string.Empty;
-            var textContent = TryGetString(article, "textContent");
-            var isPlaceholder = textContent?.StartsWith("{extracted", StringComparison.OrdinalIgnoreCase) == true;
-            var markdownContent = (!string.IsNullOrWhiteSpace(textContent) && !isPlaceholder)
-                ? textContent
-                : StripHtmlToText(TryGetString(article, "htmlContent") ?? TryGetString(article, "description") ?? string.Empty);
-            var wordCount = markdownContent
-                .Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries)
-                .Length;
-
-            var analysisJson = JsonSerializer.Serialize(
-                new { title, date, source, markdownContent, wordCount }, JsonOptions);
+            var analysisJson = content;
 
             await _blobStorageService.WriteTextAsync(NewsAnalysisContainer, blobName, analysisJson, "application/json");
             await _fabricLakehouseService.WriteFileAsync($"news-analysis/{blobName}", analysisJson);
@@ -483,8 +465,13 @@ public sealed class MarketInsightMcpTools
                     var root = doc.RootElement;
                     if (root.TryGetProperty("title", out var t)) title = t.GetString();
                     if (root.TryGetProperty("date", out var d)) date = d.GetString();
+                    else if (root.TryGetProperty("publishDateIso", out var di)) date = di.GetString();
+                    else if (root.TryGetProperty("publishDate", out var dp)) date = dp.GetString();
                     if (root.TryGetProperty("source", out var s)) source = s.GetString();
+                    else if (root.TryGetProperty("domain", out var dom)) source = dom.GetString();
                     if (root.TryGetProperty("wordCount", out var w) && w.TryGetInt32(out var wc)) wordCount = wc;
+                    else if (root.TryGetProperty("textContent", out var tc) && tc.GetString() is { } tcStr)
+                        wordCount = tcStr.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries).Length;
                 }
                 catch (JsonException)
                 {
@@ -529,7 +516,10 @@ public sealed class MarketInsightMcpTools
                     var root = doc.RootElement;
                     if (root.TryGetProperty("title", out var t)) title = t.GetString();
                     if (root.TryGetProperty("date", out var d)) date = d.GetString();
+                    else if (root.TryGetProperty("publishDateIso", out var di)) date = di.GetString();
+                    else if (root.TryGetProperty("publishDate", out var dp)) date = dp.GetString();
                     if (root.TryGetProperty("markdownContent", out var m)) markdownContent = m.GetString();
+                    else if (root.TryGetProperty("textContent", out var tc)) markdownContent = tc.GetString();
                 }
                 catch (JsonException)
                 {
@@ -609,8 +599,12 @@ public sealed class MarketInsightMcpTools
                 var root = doc.RootElement;
                 if (root.TryGetProperty("title", out var t)) title = t.GetString();
                 if (root.TryGetProperty("date", out var d)) date = d.GetString();
+                else if (root.TryGetProperty("publishDateIso", out var di)) date = di.GetString();
+                else if (root.TryGetProperty("publishDate", out var dp)) date = dp.GetString();
                 if (root.TryGetProperty("source", out var s)) source = s.GetString();
+                else if (root.TryGetProperty("domain", out var dom)) source = dom.GetString();
                 if (root.TryGetProperty("markdownContent", out var m)) markdownContent = m.GetString();
+                else if (root.TryGetProperty("textContent", out var tc)) markdownContent = tc.GetString();
             }
             catch (JsonException)
             {

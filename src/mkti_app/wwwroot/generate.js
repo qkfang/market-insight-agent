@@ -113,7 +113,7 @@ async function loadGenerateTable() {
     if (data.cachedAt && genCacheTimeEl) genCacheTimeEl.textContent = `cached ${new Date(data.cachedAt).toLocaleString()}`;
     renderGenerateTable(data.reports || []);
   } catch {
-    if (tableEl) tableEl.innerHTML = '<p style="color:var(--color-text-muted)">No cache yet — click ↻ Refresh List to load.</p>';
+    await refreshGenerateCache();
   }
 }
 

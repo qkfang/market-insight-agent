@@ -94,14 +94,40 @@ function researchJsonToMarkdown(jsonString) {
   const summary = obj.summary || '';
   const drivers = Array.isArray(obj.keyDrivers) ? obj.keyDrivers : [];
   const weekStart = obj.weekStart || obj.date || '';
+  const weekEnd = obj.weekEnd || '';
+  const newsArticles = Array.isArray(obj.newsAnalysisArticles) ? obj.newsAnalysisArticles : [];
+  const bingNews = Array.isArray(obj.bingNews) ? obj.bingNews : [];
+
   let md = `# ${icon} ${market} Market Research\n\n`;
-  if (weekStart) md += `**Week Start:** ${weekStart}\n\n`;
+  if (weekStart) md += `**Week:** ${weekStart}${weekEnd ? ` → ${weekEnd}` : ''}\n\n`;
   md += `## Sentiment\n**${sentiment}** — Confidence: ${confidence}\n\n`;
   if (summary) md += `## Summary\n${summary}\n\n`;
   if (drivers.length) {
     md += `## Key Drivers\n`;
     drivers.forEach(d => { md += `- ${d}\n`; });
     md += '\n';
+  }
+  if (newsArticles.length) {
+    md += `## News Analysis Articles\n`;
+    newsArticles.forEach(a => {
+      const title = a.title || 'Untitled';
+      const date = a.date ? ` *(${a.date})*` : '';
+      const url = a.sourceUrl ? ` — [source](${a.sourceUrl})` : '';
+      md += `### ${title}${date}${url}\n`;
+      if (a.snippet) md += `${a.snippet}\n\n`;
+      if (a.reasoningSummary) md += `> **Reasoning:** ${a.reasoningSummary}\n\n`;
+    });
+  }
+  if (bingNews.length) {
+    md += `## Bing News\n`;
+    bingNews.forEach(a => {
+      const title = a.title || 'Untitled';
+      const date = a.date ? ` *(${a.date})*` : '';
+      const url = a.sourceUrl ? ` — [source](${a.sourceUrl})` : '';
+      md += `### ${title}${date}${url}\n`;
+      if (a.snippet) md += `${a.snippet}\n\n`;
+      if (a.reasoningSummary) md += `> **Reasoning:** ${a.reasoningSummary}\n\n`;
+    });
   }
   return md.trim();
 }

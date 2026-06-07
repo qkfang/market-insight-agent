@@ -17,7 +17,7 @@ param principals = [
 param fabricAdminMembers = [
   'danielfang@MngEnvMCAP951655.onmicrosoft.com'
   'fabric@MngEnvMCAP951655.onmicrosoft.com'
-  'sp-playground-01'
+  '6c2ec22f-9401-452f-8d04-10bfddfab00f'
 ]
 
 param fabricLakehouseWorkspaceId = 'b4b2a30e-7ca8-4843-8dd8-bf84e283e025'

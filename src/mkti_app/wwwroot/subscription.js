@@ -84,13 +84,34 @@ generateBtn.onclick = async () => {
     return;
   }
 
+  generateBtn.disabled = true;
+  subSpinner.hidden = false;
+  subStatus.innerHTML = '';
+
+  try {
+    await showInsightForMarket(selectedMarkets[0]);
+  } catch (e) {
+    subStatus.innerHTML = `<p class="research-error">Error: ${escapeHtml(e.message)}</p>`;
+  } finally {
+    generateBtn.disabled = false;
+    subSpinner.hidden = true;
+  }
+};
+
+if (createPdfBtn) createPdfBtn.onclick = async () => {
+  const selectedMarkets = Array.from(document.querySelectorAll('input[name="sub-market"]:checked')).map(cb => cb.value);
+  if (selectedMarkets.length === 0) {
+    subStatus.innerHTML = '<p class="research-error">Please select at least one market.</p>';
+    return;
+  }
+
   const audience = audienceSelect.value;
   const from = fromInput.value;
   const to   = toInput.value;
 
-  generateBtn.disabled = true;
+  createPdfBtn.disabled = true;
   subSpinner.hidden = false;
-  subStatus.innerHTML = `<p style="color:var(--color-text-muted);font-size:13px;">Loading reports for ${escapeHtml(audience)}… this may take 30–60 seconds.</p>`;
+  subStatus.innerHTML = `<p style="color:var(--color-text-muted);font-size:13px;">Generating report for ${escapeHtml(audience)}… this may take 30–60 seconds.</p>`;
 
   try {
     const response = await fetch('/api/subscription/generate', {
@@ -104,16 +125,14 @@ generateBtn.onclick = async () => {
 
     subStatus.innerHTML = `<p style="color:var(--color-success);font-size:13px;">✓ ${(json.reports || []).length} report(s) generated for <strong>${escapeHtml(audience)}</strong>.</p>`;
 
-    // Show the insight for the first selected market
     if (selectedMarkets.length > 0) {
       await showInsightForMarket(selectedMarkets[0]);
     }
+    window.print();
   } catch (e) {
     subStatus.innerHTML = `<p class="research-error">Error: ${escapeHtml(e.message)}</p>`;
   } finally {
-    generateBtn.disabled = false;
+    createPdfBtn.disabled = false;
     subSpinner.hidden = true;
   }
 };
-
-if (createPdfBtn) createPdfBtn.onclick = () => window.print();

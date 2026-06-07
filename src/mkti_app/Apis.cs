@@ -24,7 +24,7 @@ public static class Apis
         app.MapGet("/api/news/ingest", async () =>
         {
             var before = await blobStorageService.ListBlobNamesAsync("news-store");
-            var result = await newsIngestionAgent.RunAsync("Ingest local articles-xx.json and store each full article JSON object in news-store using {yyyyMMddHHmmssfff}_{guid}.json blob names.");
+            var result = await newsIngestionAgent.RunAsync("Ingest local articles-june.json and store each full article JSON object in news-store using {yyyyMMddHHmmssfff}_{guid}.json blob names.");
             var after = await blobStorageService.ListBlobNamesAsync("news-store");
 
             var delta = after.Count - before.Count;

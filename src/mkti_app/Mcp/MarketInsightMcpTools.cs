@@ -50,7 +50,7 @@ public sealed class MarketInsightMcpTools
         _defaultRssFeeds = [$"{appMcpUrl.TrimEnd('/')}/api/mock/rss"];
     }
 
-    [McpServerTool(Name = "ingest_articles_json_to_news_store"), Description("Load local articles-xx.json and store each article object unchanged to the news-store container and Fabric Lakehouse news-store folder. Blob name format is {yyyyMMddHHmmssfff}_{guid}.json where timestamp comes from the article datetime and guid comes from JSON.")]
+    [McpServerTool(Name = "ingest_articles_json_to_news_store"), Description("Load local articles-june.json and store each article object unchanged to the news-store container and Fabric Lakehouse news-store folder. Blob name format is {yyyyMMddHHmmssfff}_{guid}.json where timestamp comes from the article datetime and guid comes from JSON.")]
     public async Task<string> IngestArticlesJsonToNewsStore(
         [Description("Optional JSON filename under the app data folder, e.g. articles-june.json. Defaults to latest articles-*.json, then articles.json.")] string? fileName = null)
     {

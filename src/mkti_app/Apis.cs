@@ -565,6 +565,21 @@ public static class Apis
             return Results.Content(content, "text/html; charset=utf-8");
         });
 
+        // ── Blob-list cache GET (read from writable temp dir) ────────────────
+        app.MapGet("/api/cache/{type}", (string type) =>
+        {
+            var validTypes = new[] { "ingest", "analyze", "research", "generate" };
+            if (!validTypes.Contains(type))
+                return Results.BadRequest("Unknown cache type.");
+
+            var cacheFile = Path.Combine(Path.GetTempPath(), $"mkti_cache-{type}.json");
+            if (!File.Exists(cacheFile))
+                return Results.NotFound();
+
+            var json = File.ReadAllText(cacheFile, System.Text.Encoding.UTF8);
+            return Results.Content(json, "application/json");
+        });
+
         // ── Blob-list cache refresh ──────────────────────────────────────────
         app.MapPost("/api/cache/refresh/{type}", async (string type, IWebHostEnvironment env) =>
         {
@@ -572,12 +587,7 @@ public static class Apis
             if (!validTypes.Contains(type))
                 return Results.BadRequest("Unknown cache type.");
 
-            var webRoot = env.WebRootPath;
-            if (string.IsNullOrWhiteSpace(webRoot))
-                webRoot = Path.Combine(env.ContentRootPath, "wwwroot");
-            var tempDir = Path.Combine(webRoot, "temp");
-            Directory.CreateDirectory(tempDir);
-            var cacheFile = Path.Combine(tempDir, $"cache-{type}.json");
+            var cacheFile = Path.Combine(Path.GetTempPath(), $"mkti_cache-{type}.json");
 
             object payload;
 

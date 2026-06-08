@@ -175,7 +175,7 @@ const researchCacheTimeEl = document.getElementById('research-cache-time');
 async function loadResearchTable() {
   const tableEl = document.getElementById('research-table');
   try {
-    const r = await fetch('/temp/cache-research.json');
+    const r = await fetch('/api/cache/research');
     if (!r.ok) throw new Error('no cache');
     const data = await r.json();
     if (data.cachedAt && researchCacheTimeEl) researchCacheTimeEl.textContent = `cached ${new Date(data.cachedAt).toLocaleString()}`;

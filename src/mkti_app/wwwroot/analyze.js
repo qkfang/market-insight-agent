@@ -40,7 +40,7 @@ const cacheTimeEl = document.getElementById('analyze-cache-time');
 async function loadAnalysisTable() {
   const tableEl = document.getElementById('analysis-table');
   try {
-    const r = await fetch('/temp/cache-analyze.json');
+    const r = await fetch('/api/cache/analyze');
     if (!r.ok) throw new Error('no cache');
     const data = await r.json();
     if (data.cachedAt && cacheTimeEl) cacheTimeEl.textContent = `cached ${new Date(data.cachedAt).toLocaleString()}`;

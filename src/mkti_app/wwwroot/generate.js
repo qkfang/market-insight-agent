@@ -107,7 +107,7 @@ const genCacheTimeEl = document.getElementById('generate-cache-time');
 async function loadGenerateTable() {
   const tableEl = document.getElementById('generate-table');
   try {
-    const r = await fetch('/temp/cache-generate.json');
+    const r = await fetch('/api/cache/generate');
     if (!r.ok) throw new Error('no cache');
     const data = await r.json();
     if (data.cachedAt && genCacheTimeEl) genCacheTimeEl.textContent = `cached ${new Date(data.cachedAt).toLocaleString()}`;

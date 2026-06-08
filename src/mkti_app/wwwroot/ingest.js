@@ -32,7 +32,7 @@ let cachedFilenames = [];
 
 async function loadFromCache() {
   try {
-    const r = await fetch('/temp/cache-ingest.json');
+    const r = await fetch('/api/cache/ingest');
     if (!r.ok) throw new Error('no cache');
     const json = await r.json();
     cachedFilenames = json.filenames || [];

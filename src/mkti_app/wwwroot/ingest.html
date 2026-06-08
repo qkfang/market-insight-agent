@@ -37,11 +37,7 @@
     <div class="panel">
       <div class="panel-header">
         <div>
-          <h2 class="panel-title">News Ingestion <span class="agent-hint"><a href="#">Agent Instructions</a><div class="agent-popup">You are a news ingestion agent for copper market. Download articles from RSS feeds and store each article as HTML in the news store. Track what has been stored to avoid duplicates.
-
-Use the fetch_rss_feed tool to discover copper market articles, list_stored_news to check what is already stored, download_article to retrieve full HTML, and store_news_article to persist each new article.
-
-When calling store_news_article, provide a concise kebab-case description of the article as the 'description' parameter (e.g. 'copper-prices-surge-q2'). The tool will automatically prepend a millisecond timestamp prefix to form the final filename.</div></span></h2>
+          <h2 class="panel-title">News Ingestion <span class="agent-hint"><a href="#">Agent Instructions</a><div class="agent-popup">You are a news ingestion agent for copper market. Ingest individual article JSON files from the data/articles/ folder and store each one unchanged in the news store.<br><br>Use the ingest_articles_json_to_news_store tool once per run, passing the dateFrom and dateTo parameters exactly as supplied in the user message.<br>The blob filename must be {yyyyMMddHHmmssfff}_{guid}.json, where the timestamp is derived from the article datetime in JSON and guid is from the JSON payload.<br>Do not download RSS feeds and do not transform article content into HTML.<br><br>Each analysis blob written to news-store looks like:<br>{ "id": "1", "guid": "3f3d8a16-...", "title": "Copper Price Forecast: ...", "publishDate": "Wed, 03 Jun 2026 09:47:00 +0000", "publishDateIso": "2026-06-03T09:47:00+00:00", "description": "...", "source": "FXEmpire", "domain": "fxempire.com", "originalUrl": "https://...", "htmlContent": "<!DOCTYPE html>..." }</div></span></h2>
           <p class="panel-desc">Download the latest copper market news from RSS feeds and store articles in Fabric Datalake and Azure Blob Storage.</p>
         </div>
       </div>

@@ -37,12 +37,7 @@
     <div class="panel">
       <div class="panel-header">
         <div>
-          <h2 class="panel-title">Market Research <span class="agent-hint"><a href="#">Agent Instructions</a><div class="agent-popup">You are a copper market research analyst. Read the latest news analysis documents (read_latest_news_analysis), search Bing for current copper price and market news (bing_search_copper_market), then query the Fabric data agent for historical trends.
-
-Produce a structured sentiment assessment: bullish/bearish/neutral with a confidence score and key drivers.
-
-Respond with ONLY a single JSON object (no markdown fences) using exactly these fields:
-{ "sentiment": "bullish|bearish|neutral", "confidence": 0.0-1.0, "keyDrivers": ["..."], "summary": "..." }</div></span></h2>
+          <h2 class="panel-title">Market Research <span class="agent-hint"><a href="#">Agent Instructions</a><div class="agent-popup">You are a commodity market research analyst. You will receive the market name, weekStart (Monday yyyy-MM-dd) and weekEnd (Sunday yyyy-MM-dd) in the user message.<br><br>Follow these steps in order:<br>1. Call read_news_analysis_by_market with the market name, weekStart and weekEnd to get related news analysis articles filtered to the date range.<br>2. Call bing_search_market with the market name, weekStart and weekEnd to get current Bing news results for that date range.<br>3. Produce a weekly research report as a single JSON object and call store_weekly_market_research to persist it.<br><br>The JSON object must use exactly these fields (no markdown fences, no extra keys): market, weekStart, weekEnd, sentiment (bullish|bearish|neutral), confidence (0.0–1.0), keyDrivers ([...]), summary, newsAnalysisArticles ([{title, date, snippet, sourceUrl, blobfilename, reasoningSummary}]), bingNews ([{title, date, snippet, sourceUrl, reasoningSummary}]).</div></span></h2>
           <p class="panel-desc">Research current copper market sentiment from the latest news analysis, Bing search, and the Fabric data agent. This may take 30–60 seconds.</p>
         </div>
       </div>

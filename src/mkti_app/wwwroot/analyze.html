@@ -37,13 +37,7 @@
     <div class="panel">
       <div class="panel-header">
         <div>
-          <h2 class="panel-title">News Analysis <span class="agent-hint"><a href="#">Agent Instructions</a><div class="agent-popup">You are a news analysis agent for copper market. Read unprocessed news articles from the news-store (they are JSON objects) and store structured analysis in news-analysis.
-
-Use the analyze_news_json_to_analysis tool once per run.
-
-The analysis blob filename must match the source blob filename: {yyyyMMddHHmmssfff}_{guid}.json.
-
-Do not use Document Intelligence and do not convert HTML manually; the tool handles extraction from JSON fields.</div></span></h2>
+          <h2 class="panel-title">News Analysis <span class="agent-hint"><a href="#">Agent Instructions</a><div class="agent-popup">You are a news analysis agent for copper market. Read unprocessed news articles from the news-store (they are JSON objects) and store structured analysis in news-analysis.<br><br>Step 1: Call extract_html_to_text_content to convert htmlContent to markdown and populate the textContent field for all articles in news-store.<br>Step 2: Call analyze_news_json_to_analysis once to read the enriched articles (now with textContent) and write structured analysis to news-analysis.<br><br>The analysis blob filename must match the source blob filename: {yyyyMMddHHmmssfff}_{guid}.json. Do not use Document Intelligence and do not convert HTML manually; the tools handle all extraction.<br><br>After step 2, write the analysis blob to news-analysis. The output must: omit the htmlContent field entirely; summarize textContent to only the key information (main findings, price movements, market drivers, risks — 3 to 5 sentences maximum).</div></span></h2>
           <p class="panel-desc">Parse unprocessed news articles with Document Intelligence into structured JSON.</p>
         </div>
       </div>

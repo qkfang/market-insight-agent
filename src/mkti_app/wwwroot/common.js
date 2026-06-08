@@ -1,5 +1,83 @@
 // Shared helpers used across the physical pages.
 
+// Agent Instructions — click to open as a formatted modal
+document.addEventListener('DOMContentLoaded', () => {
+  document.querySelectorAll('.agent-hint a').forEach(link => {
+    link.addEventListener('click', e => {
+      e.preventDefault();
+      const hint = link.closest('.agent-hint');
+      const popup = hint.querySelector('.agent-popup');
+      if (!popup) return;
+      const h2 = hint.closest('h2');
+      const titleText = h2
+        ? Array.from(h2.childNodes).filter(n => n.nodeType === 3).map(n => n.textContent.trim()).join('').trim()
+        : 'Agent';
+      showAgentInstructionsModal(titleText, popup.innerHTML);
+    });
+  });
+});
+
+function showAgentInstructionsModal(agentTitle, htmlContent) {
+  const existing = document.getElementById('agent-modal-overlay');
+  if (existing) existing.remove();
+  const text = htmlContent.replace(/<br\s*\/?>/gi, '\n').replace(/<[^>]+>/g, '').trim();
+  const overlay = document.createElement('div');
+  overlay.id = 'agent-modal-overlay';
+  overlay.className = 'modal-overlay';
+  overlay.innerHTML = `
+    <div class="modal">
+      <div class="modal-header">
+        <strong>🤖 Agent Instructions — ${escapeHtml(agentTitle)}</strong>
+        <button class="modal-close" type="button">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="agent-instructions-body">${formatAgentInstructions(text)}</div>
+      </div>
+    </div>`;
+  overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove(); });
+  overlay.querySelector('.modal-close').onclick = () => overlay.remove();
+  document.body.appendChild(overlay);
+}
+
+function formatAgentInstructions(text) {
+  const paras = text.split(/\n\n+/);
+  let html = '';
+  let isFirst = true;
+  for (const para of paras) {
+    const trimmed = para.trim();
+    if (!trimmed) continue;
+    const lines = trimmed.split('\n').map(l => l.trim()).filter(Boolean);
+    // JSON / code block
+    if (trimmed.startsWith('{') || trimmed.startsWith('[')) {
+      html += `<pre class="ai-code">${escapeHtml(trimmed)}</pre>`;
+      isFirst = false;
+      continue;
+    }
+    // Separate numbered step lines from intro lines
+    const introLines = [];
+    const stepLines = [];
+    for (const line of lines) {
+      if (/^\d+\.\s/.test(line)) stepLines.push(line);
+      else if (stepLines.length === 0) introLines.push(line);
+    }
+    if (stepLines.length > 0) {
+      if (introLines.length) html += `<p class="ai-intro">${escapeHtml(introLines.join(' '))}</p>`;
+      html += '<ol class="ai-steps">';
+      for (const line of stepLines) {
+        html += `<li>${escapeHtml(line.replace(/^\d+\.\s/, '').trim())}</li>`;
+      }
+      html += '</ol>';
+      isFirst = false;
+      continue;
+    }
+    // First paragraph = role description (highlighted)
+    const cls = isFirst ? 'ai-role' : 'ai-para';
+    html += `<p class="${cls}">${lines.map(l => escapeHtml(l)).join('<br>')}</p>`;
+    isFirst = false;
+  }
+  return html;
+}
+
 function escapeHtml(value) {
   return String(value ?? '')
     .replace(/&/g, '&amp;')

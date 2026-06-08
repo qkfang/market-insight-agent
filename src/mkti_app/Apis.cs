@@ -304,9 +304,9 @@ public static class Apis
             });
         });
 
-        app.MapGet("/api/insight/generate", async (string? from, string? to, string? markets) =>
+        app.MapGet("/api/insight/generate", async (string? from, string? to, string? markets, bool regen = false) =>
         {
-            logger.LogInformation("/api/insight/generate called, from={From}, to={To}, markets={Markets}", from, to, markets);
+            logger.LogInformation("/api/insight/generate called, from={From}, to={To}, markets={Markets}, regen={Regen}", from, to, markets, regen);
             var allMarkets = new[] { "copper", "gold", "silver", "oil" };
             var selectedMarkets = string.IsNullOrWhiteSpace(markets)
                 ? allMarkets
@@ -326,6 +326,34 @@ public static class Apis
             var results = new List<object>();
             foreach (var market in selectedMarkets)
             {
+                // Check if insight already exists for this market/date when regen is not requested
+                if (!regen)
+                {
+                    var existingFilename = $"{fromStr}_{market}_insight.md";
+                    var existingContent = await blobStorageService.ReadTextAsync("market-insight", existingFilename) ?? string.Empty;
+                    if (string.IsNullOrEmpty(existingContent))
+                    {
+                        // Fallback: find any stored file for this market
+                        var names = await blobStorageService.ListBlobNamesAsync("market-insight");
+                        var match = names.OrderByDescending(n => n, StringComparer.Ordinal)
+                            .FirstOrDefault(n => n.Contains($"_{market}_insight", StringComparison.OrdinalIgnoreCase));
+                        if (match is not null)
+                        {
+                            existingFilename = match;
+                            existingContent = await blobStorageService.ReadTextAsync("market-insight", match) ?? string.Empty;
+                        }
+                    }
+                    if (!string.IsNullOrEmpty(existingContent))
+                    {
+                        logger.LogInformation("Returning cached insight for market={Market}, filename={Filename}", market, existingFilename);
+                        var cachedPreview = existingContent.Length > InsightPreviewMaxLength
+                            ? existingContent[..InsightPreviewMaxLength]
+                            : existingContent;
+                        results.Add(new { market, date = fromStr, filename = existingFilename, preview = cachedPreview, cached = true });
+                        continue;
+                    }
+                }
+
                 var message =
                     $"Generate a professional market insight report for the {market} market. " +
                     $"Focus ONLY on the {market} market. " +

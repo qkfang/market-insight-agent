@@ -3,6 +3,7 @@ const spinner = document.getElementById('generate-spinner');
 const fromInput = document.getElementById('generate-from');
 const toInput = document.getElementById('generate-to');
 const resultEl = document.getElementById('generate-result');
+const regenCheckbox = document.getElementById('generate-regen');
 
 const marketIcons = { copper: '🟤', gold: '🟡', silver: '⚪', oil: '🛢️' };
 
@@ -14,12 +15,14 @@ function renderInsightCard(m) {
   const icon = marketIcons[m.market] || '📊';
   const previewText = (m.preview || '').replace(/^#+\s.*/gm, '').replace(/\*\*/g, '').trim();
   const shortPreview = previewText.length > 400 ? previewText.slice(0, 400) + '…' : previewText;
+  const cachedBadge = m.cached ? `<span class="status-badge" style="font-size:11px;background:var(--color-bg-alt,#f0f4ff);color:var(--color-text-muted);">cached</span>` : '';
   const filenameLabel = m.filename ? `<span class="status-badge success" style="font-size:11px;">${escapeHtml(m.filename)}</span>` : '';
   return `
     <div class="research-card">
       <div class="research-card-header">
         <span class="research-market-name">${icon} ${escapeHtml((m.market || '').toUpperCase())}</span>
         <div style="display:flex;align-items:center;gap:8px;">
+          ${cachedBadge}
           ${filenameLabel}
           <a class="action" style="padding:4px 12px;font-size:12px;" href="/delivery.html">→ Full Report</a>
         </div>
@@ -43,14 +46,18 @@ btn.onclick = async () => {
     resultEl.innerHTML = '<p class="research-error">Please select at least one market.</p>';
     return;
   }
+  const isRegen = regenCheckbox && regenCheckbox.checked;
   btn.disabled = true;
   spinner.hidden = false;
-  resultEl.innerHTML = `<p style="color:var(--color-text-muted);font-size:13px;">Generating insight reports… this may take 30–90 seconds per market.</p>`;
+  resultEl.innerHTML = isRegen
+    ? `<p style="color:var(--color-text-muted);font-size:13px;">Regenerating insight reports… this may take 30–90 seconds per market.</p>`
+    : `<p style="color:var(--color-text-muted);font-size:13px;">Loading insights… using cached reports where available.</p>`;
   try {
     const params = new URLSearchParams();
     if (fromInput.value) params.set('from', fromInput.value);
     if (toInput.value) params.set('to', toInput.value);
     params.set('markets', selected.join(','));
+    if (isRegen) params.set('regen', 'true');
     const response = await fetch(`/api/insight/generate?${params}`);
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
     const json = await response.json();

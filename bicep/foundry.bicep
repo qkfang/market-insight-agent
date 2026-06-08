@@ -49,7 +49,7 @@ resource gpt54Deployment 'Microsoft.CognitiveServices/accounts/deployments@2024-
   name: modelDeploymentName
   sku: {
     name: 'GlobalStandard'
-    capacity: 500
+    capacity: 900
   }
   properties: {
     model: {

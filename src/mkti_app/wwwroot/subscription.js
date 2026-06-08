@@ -39,41 +39,11 @@ async function showInsightForMarket(market) {
 // ── Subscription Report Generator ────────────────────────────────────────────
 const generateBtn  = document.getElementById('subscription-generate');
 const createPdfBtn = document.getElementById('subscription-create-pdf');
-const subRefreshBtn  = document.getElementById('sub-refresh-btn');
-const subCacheTimeEl = document.getElementById('sub-cache-time');
 const subSpinner   = document.getElementById('sub-spinner');
 const subStatus    = document.getElementById('sub-status');
 const fromInput    = document.getElementById('sub-from');
 const toInput      = document.getElementById('sub-to');
 const audienceSelect = document.getElementById('sub-audience');
-
-async function loadSubscriptionCache() {
-  try {
-    const r = await fetch('/temp/cache-subscription.json');
-    if (!r.ok) throw new Error('no cache');
-    const json = await r.json();
-    if (json.cachedAt && subCacheTimeEl) subCacheTimeEl.textContent = `cached ${new Date(json.cachedAt).toLocaleString()}`;
-  } catch {
-    if (subCacheTimeEl) subCacheTimeEl.textContent = '';
-  }
-}
-
-async function refreshSubscriptionCache() {
-  if (subRefreshBtn) subRefreshBtn.disabled = true;
-  try {
-    const r = await fetch('/api/insight/list');
-    if (!r.ok) throw new Error(`HTTP ${r.status}`);
-    const now = new Date().toLocaleString();
-    if (subCacheTimeEl) subCacheTimeEl.textContent = `cached ${now}`;
-  } catch (e) {
-    if (subCacheTimeEl) subCacheTimeEl.textContent = `refresh failed`;
-  } finally {
-    if (subRefreshBtn) subRefreshBtn.disabled = false;
-  }
-}
-
-if (subRefreshBtn) subRefreshBtn.onclick = refreshSubscriptionCache;
-loadSubscriptionCache();
 
 const marketIcons = { copper: '🟤', gold: '🟡', silver: '⚪', oil: '🛢️' };
 

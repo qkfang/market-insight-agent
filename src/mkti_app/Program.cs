@@ -78,6 +78,7 @@ builder.Services.AddSingleton(sp => new BingSearchService(
     sp.GetRequiredService<IHttpClientFactory>(),
     sp.GetRequiredService<ILogger<BingSearchService>>()));
 
+builder.Services.AddSingleton<mkti_app.Mcp.MarketInsightMcpTools>();
 builder.Services.AddMcpServer()
     .WithHttpTransport(options => { options.Stateless = true; })
     .WithTools<MarketInsightMcpTools>();
@@ -159,6 +160,7 @@ var subscriptionAgent = new SubscriptionAgent(aiProjectClient, deploymentName, [
 
 var blobStorageService = app.Services.GetRequiredService<BlobStorageService>();
 var fabricLakehouseService = app.Services.GetRequiredService<FabricLakehouseService>();
+var mcpTools = app.Services.GetRequiredService<mkti_app.Mcp.MarketInsightMcpTools>();
 
 app.MapAllEndpoints(
     newsIngestionAgent,
@@ -168,6 +170,7 @@ app.MapAllEndpoints(
     subscriptionAgent,
     blobStorageService,
     fabricLakehouseService,
+    mcpTools,
     loggerFactory.CreateLogger("Apis"));
 
 await app.RunAsync();

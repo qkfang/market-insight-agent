@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using mkti_app.Agents;
+using mkti_app.Mcp;
 using mkti_app.Services;
 
 namespace mkti_app;
@@ -21,6 +22,7 @@ public static class Apis
         SubscriptionAgent subscriptionAgent,
         BlobStorageService blobStorageService,
         FabricLakehouseService fabricLakehouseService,
+        MarketInsightMcpTools mcpTools,
         ILogger logger)
     {
         app.MapGet("/api/news/ingest", async (string? from, string? to) =>
@@ -482,55 +484,53 @@ public static class Apis
             var results = new List<object>();
             foreach (var market in selectedMarkets)
             {
-                var message =
-                    $"Generate a subscription report for the {market} market for customer '{audience}'. " +
-                    $"Date range: {fromDate} to {toDate}. " +
-                    $"Use read_market_insight_for_market with market='{market}' to get the insight, " +
-                    $"then call generate_subscription_report with market='{market}', audience='{audience}', " +
-                    $"fromDate='{fromDate}', toDate='{toDate}', and the retrieved insight markdown. " +
-                    $"Return the filename from generate_subscription_report.";
-
-                logger.LogInformation("Invoking SubscriptionAgent for market={Market}, audience={Audience}", market, audience);
-                var subSw = Stopwatch.StartNew();
-                var agentResult = await subscriptionAgent.RunAsync(message);
-                subSw.Stop();
-                logger.LogInformation("SubscriptionAgent completed for market={Market} in {ElapsedMs}ms", market, subSw.ElapsedMilliseconds);
-
-                // Try to parse the filename from the agent result
-                string? filename = null;
-                string? htmlBase64 = null;
-                string? pdfFilename = null;
-                string? pdfUrl = null;
+                // Step 1: Read the market insight directly
+                var insightJson = await mcpTools.ReadMarketInsightForMarket(market);
+                string insightMarkdown = string.Empty;
                 try
                 {
-                    using var doc = System.Text.Json.JsonDocument.Parse(agentResult);
-                    var root = doc.RootElement;
+                    using var insightDoc = System.Text.Json.JsonDocument.Parse(insightJson);
+                    if (insightDoc.RootElement.TryGetProperty("content", out var contentEl))
+                        insightMarkdown = contentEl.GetString() ?? string.Empty;
+                }
+                catch { }
+
+                // Step 2: Generate the branded HTML report
+                var reportJson = await mcpTools.GenerateSubscriptionReport(market, audience, fromDate, toDate, insightMarkdown);
+                string? filename = null;
+                string? htmlBase64 = null;
+                try
+                {
+                    using var reportDoc = System.Text.Json.JsonDocument.Parse(reportJson);
+                    var root = reportDoc.RootElement;
                     if (root.TryGetProperty("filename", out var fn)) filename = fn.GetString();
                     if (root.TryGetProperty("htmlBase64", out var hb)) htmlBase64 = hb.GetString();
-                    if (root.TryGetProperty("pdfFilename", out var pfn)) pdfFilename = pfn.GetString();
-                    if (root.TryGetProperty("pdfUrl", out var pu)) pdfUrl = pu.GetString();
                 }
-                catch
+                catch { }
+
+                // Step 3: Generate PDF from the HTML report
+                string? pdfFilename = null;
+                string? pdfUrl = null;
+                if (!string.IsNullOrEmpty(filename))
                 {
-                    // Try to extract filename from free-text
-                    var fnMatch = System.Text.RegularExpressions.Regex.Match(agentResult, @"\d{4}-\d{2}-\d{2}_\w+_[\w-]+_report\.html");
-                    if (fnMatch.Success) filename = fnMatch.Value;
+                    var pdfJson = await mcpTools.GeneratePdfReport(filename);
+                    try
+                    {
+                        using var pdfDoc = System.Text.Json.JsonDocument.Parse(pdfJson);
+                        var root = pdfDoc.RootElement;
+                        if (!root.TryGetProperty("error", out _))
+                        {
+                            if (root.TryGetProperty("pdfFilename", out var pfn)) pdfFilename = pfn.GetString();
+                            if (root.TryGetProperty("pdfUrl", out var pu)) pdfUrl = pu.GetString();
+                        }
+                    }
+                    catch { }
                 }
 
-                // If agent did not produce base64, read the stored HTML from blob
-                if (string.IsNullOrEmpty(htmlBase64) && !string.IsNullOrEmpty(filename))
-                {
-                    var htmlContent = await blobStorageService.ReadTextAsync("market-subscription", filename);
-                    if (!string.IsNullOrEmpty(htmlContent))
-                        htmlBase64 = Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes(htmlContent));
-                }
-
-                // Derive pdfUrl from filename if agent didn't return it
                 if (string.IsNullOrEmpty(pdfUrl) && !string.IsNullOrEmpty(filename))
                 {
-                    var derivedPdf = System.IO.Path.ChangeExtension(filename, ".pdf");
-                    pdfFilename = derivedPdf;
-                    pdfUrl = $"/temp/{derivedPdf}";
+                    pdfFilename = System.IO.Path.ChangeExtension(filename, ".pdf");
+                    pdfUrl = $"/temp/{pdfFilename}";
                 }
 
                 results.Add(new
@@ -558,7 +558,7 @@ public static class Apis
             if (string.IsNullOrEmpty(safeName) || safeName != filename)
                 return Results.BadRequest("Invalid filename");
 
-            var content = await blobStorageService.ReadTextAsync("market-subscription", safeName);
+            var content = await blobStorageService.ReadTextAsync("subscription-reports", safeName);
             if (content is null)
                 return Results.NotFound();
 

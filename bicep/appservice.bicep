@@ -73,7 +73,7 @@ resource webApp 'Microsoft.Web/sites@2023-12-01' = {
         }
         {
           name: 'WEBSITE_RUN_FROM_PACKAGE'
-          value: '1'
+          value: '0'
         }
         {
           name: 'AZURE_AI_PROJECT_ENDPOINT'

@@ -26,6 +26,8 @@ public sealed class MarketInsightMcpTools
     private const string MarketResearchContainer = "market-research";
 
     private static readonly JsonSerializerOptions JsonOptions = new() { WriteIndented = false };
+    private static string? _chromiumExecutablePath;
+    private static readonly SemaphoreSlim _browserFetchLock = new(1, 1);
 
     private readonly string[] _defaultRssFeeds;
     private readonly IWebHostEnvironment _environment;
@@ -1114,10 +1116,25 @@ public sealed class MarketInsightMcpTools
 
         try
         {
-            await new BrowserFetcher().DownloadAsync();
+            // Download Chromium once and cache the path
+            if (_chromiumExecutablePath is null)
+            {
+                await _browserFetchLock.WaitAsync();
+                try
+                {
+                    if (_chromiumExecutablePath is null)
+                    {
+                        var fetcher = new BrowserFetcher();
+                        var revisionInfo = await fetcher.DownloadAsync();
+                        _chromiumExecutablePath = revisionInfo.GetExecutablePath();
+                    }
+                }
+                finally { _browserFetchLock.Release(); }
+            }
             await using var browser = await Puppeteer.LaunchAsync(new LaunchOptions
             {
                 Headless = true,
+                ExecutablePath = _chromiumExecutablePath,
                 Args = ["--no-sandbox", "--disable-setuid-sandbox", "--disable-dev-shm-usage"]
             });
             await using var page = await browser.NewPageAsync();
@@ -1146,10 +1163,10 @@ public sealed class MarketInsightMcpTools
     {
         var (icon, color, gradientEnd, initials) = market.ToLowerInvariant() switch
         {
-            "gold"   => ("🟡", "#b45309", "#92400e", "AU"),
-            "silver" => ("⚪", "#475569", "#334155", "AG"),
-            "oil"    => ("🛢️", "#1e3a5f", "#0f172a", "OL"),
-            _        => ("🟤", "#92400e", "#78350f", "CU")  // copper
+            "gold"   => ("Au", "#b45309", "#92400e", "AU"),
+            "silver" => ("Ag", "#475569", "#334155", "AG"),
+            "oil"    => ("OL", "#1e3a5f", "#0f172a", "OL"),
+            _        => ("Cu", "#92400e", "#78350f", "CU")  // copper
         };
 
         var audienceInitials = string.Join("", audience.Split(' ', StringSplitOptions.RemoveEmptyEntries)
@@ -1173,7 +1190,7 @@ public sealed class MarketInsightMcpTools
   /* Header */
   .rpt-header { display: flex; align-items: center; justify-content: space-between; padding: 24px 36px; background: #0d1b2e; color: #fff; }
   .rpt-header-left { display: flex; align-items: center; gap: 14px; }
-  .rpt-logo-icon { width: 44px; height: 44px; border-radius: 10px; background: rgba(255,255,255,0.12); display: flex; align-items: center; justify-content: center; font-size: 22px; }
+  .rpt-logo-icon { width: 44px; height: 44px; border-radius: 10px; background: rgba(255,255,255,0.12); display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: 700; color: #93c5fd; letter-spacing: -0.5px; }
   .rpt-brand { color: #fff; }
   .rpt-brand-name { font-size: 16px; font-weight: 700; letter-spacing: -0.3px; }
   .rpt-brand-sub { font-size: 11px; color: #93c5fd; margin-top: 2px; }
@@ -1220,7 +1237,7 @@ public sealed class MarketInsightMcpTools
 <div class="page">
   <div class="rpt-header">
     <div class="rpt-header-left">
-      <div class="rpt-logo-icon">📈</div>
+      <div class="rpt-logo-icon">MI</div>
       <div class="rpt-brand">
         <div class="rpt-brand-name">Market Insight Agent</div>
         <div class="rpt-brand-sub">Professional Market Intelligence Platform</div>
@@ -1234,7 +1251,6 @@ public sealed class MarketInsightMcpTools
 
   <div class="rpt-banner">
     <div class="rpt-market-title">
-      <span>{{icon}}</span>
       <span>{{EscapeHtml(market.ToUpperInvariant())}} Market Intelligence Report</span>
     </div>
     <span class="rpt-market-badge">{{EscapeHtml(initials)}}</span>

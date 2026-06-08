@@ -125,26 +125,15 @@ if (createPdfBtn) createPdfBtn.onclick = async () => {
 
     subStatus.innerHTML = `<p style="color:var(--color-success);font-size:13px;">✓ ${(json.reports || []).length} report(s) generated for <strong>${escapeHtml(audience)}</strong>.</p>`;
 
-    // Open each report in a new tab with auto-print so user can save as PDF
+    // Download each report as PDF directly
     for (const report of (json.reports || [])) {
-      let htmlContent = '';
-      if (report.htmlBase64) {
-        htmlContent = atob(report.htmlBase64);
-      } else if (report.reportUrl) {
-        const r = await fetch(report.reportUrl);
-        if (r.ok) htmlContent = await r.text();
-      }
-      if (htmlContent) {
-        // Inject auto-print script before </body>
-        const printScript = '<script>window.onload = function() { window.print(); };<\/script>';
-        const printHtml = htmlContent.includes('</body>')
-          ? htmlContent.replace('</body>', printScript + '</body>')
-          : htmlContent + printScript;
-        const blob = new Blob([printHtml], { type: 'text/html' });
-        const url = URL.createObjectURL(blob);
-        const tab = window.open(url, '_blank');
-        // Revoke after a short delay to allow the tab to load
-        setTimeout(() => URL.revokeObjectURL(url), 30000);
+      if (report.pdfUrl) {
+        const a = document.createElement('a');
+        a.href = report.pdfUrl;
+        a.download = report.pdfFilename || `${report.market}-report.pdf`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
       }
     }
 

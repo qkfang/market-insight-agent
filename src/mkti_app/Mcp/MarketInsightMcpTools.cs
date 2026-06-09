@@ -1116,7 +1116,9 @@ public sealed class MarketInsightMcpTools
 
         try
         {
-            // Download Chromium once and cache the path
+            // Download Chromium once and cache the path.
+            // Use HOME (writable on Azure App Service Linux) so the binary is not lost on restart
+            // and has execute permissions.
             if (_chromiumExecutablePath is null)
             {
                 await _browserFetchLock.WaitAsync();
@@ -1124,7 +1126,10 @@ public sealed class MarketInsightMcpTools
                 {
                     if (_chromiumExecutablePath is null)
                     {
-                        var fetcher = new BrowserFetcher();
+                        var chromiumDownloadPath = Path.Combine(
+                            Environment.GetEnvironmentVariable("HOME") ?? Path.GetTempPath(),
+                            ".local-chromium");
+                        var fetcher = new BrowserFetcher(new BrowserFetcherOptions { Path = chromiumDownloadPath });
                         var revisionInfo = await fetcher.DownloadAsync();
                         _chromiumExecutablePath = revisionInfo.GetExecutablePath();
                     }
@@ -1135,7 +1140,16 @@ public sealed class MarketInsightMcpTools
             {
                 Headless = true,
                 ExecutablePath = _chromiumExecutablePath,
-                Args = ["--no-sandbox", "--disable-setuid-sandbox", "--disable-dev-shm-usage"]
+                Args =
+                [
+                    "--no-sandbox",
+                    "--disable-setuid-sandbox",
+                    "--disable-dev-shm-usage",
+                    "--disable-gpu",
+                    "--no-first-run",
+                    "--no-zygote",
+                    "--disable-extensions",
+                ]
             });
             await using var page = await browser.NewPageAsync();
             await page.SetContentAsync(htmlContent, new SetContentOptions { WaitUntil = [WaitUntilNavigation.DOMContentLoaded] });

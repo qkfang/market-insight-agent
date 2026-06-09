@@ -555,12 +555,6 @@ public static class Apis
                     catch { }
                 }
 
-                if (string.IsNullOrEmpty(pdfUrl) && !string.IsNullOrEmpty(filename))
-                {
-                    pdfFilename = System.IO.Path.ChangeExtension(filename, ".pdf");
-                    pdfUrl = $"/temp/{pdfFilename}";
-                }
-
                 results.Add(new
                 {
                     market,

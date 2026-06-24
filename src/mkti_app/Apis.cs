@@ -13,6 +13,17 @@ public static class Apis
     private const int KnowledgeTopArticleCount = 3;
     private const int InsightPreviewMaxLength = 500;
 
+    private static readonly System.Text.RegularExpressions.Regex HtmlTitleRegex =
+        new(@"<title[^>]*>\s*([^<]+)\s*</title>",
+            System.Text.RegularExpressions.RegexOptions.IgnoreCase | System.Text.RegularExpressions.RegexOptions.Singleline | System.Text.RegularExpressions.RegexOptions.Compiled);
+
+    private static readonly System.Text.RegularExpressions.Regex HtmlMetaDescriptionRegex =
+        new(@"<meta[^>]+name=[""']description[""'][^>]+content=[""']([^""']+)[""']",
+            System.Text.RegularExpressions.RegexOptions.IgnoreCase | System.Text.RegularExpressions.RegexOptions.Compiled);
+
+    private static string SanitizeLog(string? value) =>
+        (value ?? string.Empty).Replace('\r', ' ').Replace('\n', ' ');
+
     public static void MapAllEndpoints(
         this WebApplication app,
         NewsIngestionAgent newsIngestionAgent,
@@ -59,7 +70,7 @@ public static class Apis
 
         app.MapPost("/api/news/ingest/single", async (SingleIngestRequest request, IWebHostEnvironment env, IHttpClientFactory httpClientFactory) =>
         {
-            logger.LogInformation("/api/news/ingest/single called, url={Url}, hasText={HasText}", request.Url, !string.IsNullOrWhiteSpace(request.Text));
+            logger.LogInformation("/api/news/ingest/single called, url={Url}, hasText={HasText}", SanitizeLog(request.Url), !string.IsNullOrWhiteSpace(request.Text));
 
             var url = request.Url?.Trim();
             var pastedText = request.Text?.Trim();
@@ -79,8 +90,8 @@ public static class Apis
                     return Results.BadRequest(new { error = "Invalid URL. Must be http or https." });
 
                 domain = parsedUri.Host;
-                source = parsedUri.Host.StartsWith("www.", StringComparison.OrdinalIgnoreCase)
-                    ? parsedUri.Host[4..]
+                source = parsedUri.Host.StartsWith("www.", StringComparison.OrdinalIgnoreCase) && parsedUri.Host.Length > 4
+                    ? parsedUri.Host.Substring(4)
                     : parsedUri.Host;
 
                 try
@@ -92,7 +103,7 @@ public static class Apis
                 }
                 catch (Exception ex)
                 {
-                    logger.LogWarning(ex, "Failed to fetch URL {Url}", url);
+                    logger.LogWarning(ex, "Failed to fetch URL {Url}", SanitizeLog(url));
                     return Results.Json(new { success = false, error = $"Failed to fetch URL: {ex.Message}" });
                 }
             }
@@ -104,19 +115,13 @@ public static class Apis
             var title = request.Title?.Trim();
             if (string.IsNullOrWhiteSpace(title))
             {
-                var titleMatch = System.Text.RegularExpressions.Regex.Match(
-                    htmlContent,
-                    @"<title[^>]*>\s*([^<]+)\s*</title>",
-                    System.Text.RegularExpressions.RegexOptions.IgnoreCase | System.Text.RegularExpressions.RegexOptions.Singleline);
+                var titleMatch = HtmlTitleRegex.Match(htmlContent);
                 title = titleMatch.Success
                     ? System.Net.WebUtility.HtmlDecode(titleMatch.Groups[1].Value.Trim())
                     : "Untitled Article";
             }
 
-            var descMatch = System.Text.RegularExpressions.Regex.Match(
-                htmlContent,
-                @"<meta[^>]+name=[""']description[""'][^>]+content=[""']([^""']+)[""']",
-                System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+            var descMatch = HtmlMetaDescriptionRegex.Match(htmlContent);
             var description = descMatch.Success
                 ? System.Net.WebUtility.HtmlDecode(descMatch.Groups[1].Value.Trim())
                 : title;

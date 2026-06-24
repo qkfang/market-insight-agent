@@ -10,6 +10,7 @@ public static class Apis
     private const string DataFolderName = "data";
     private const string ArticlesFolderName = "articles";
     private const string KnowledgeArticlesFileName = "articles.json";
+    private const string SubscriptionReportsContainer = "subscription-reports";
     private const int KnowledgeTopArticleCount = 3;
     private const int InsightPreviewMaxLength = 500;
 
@@ -586,7 +587,7 @@ public static class Apis
             if (string.IsNullOrEmpty(safeName) || safeName != filename)
                 return Results.BadRequest("Invalid filename");
 
-            var content = await blobStorageService.ReadTextAsync("subscription-reports", safeName);
+            var content = await blobStorageService.ReadTextAsync(SubscriptionReportsContainer, safeName);
             if (content is null)
                 return Results.NotFound();
 
@@ -602,7 +603,7 @@ public static class Apis
             if (string.IsNullOrEmpty(safeName) || safeName != filename)
                 return Results.BadRequest("Invalid filename");
 
-            var content = await blobStorageService.ReadBytesAsync("subscription-reports", safeName);
+            var content = await blobStorageService.ReadBytesAsync(SubscriptionReportsContainer, safeName);
             if (content is null)
                 return Results.NotFound();
 

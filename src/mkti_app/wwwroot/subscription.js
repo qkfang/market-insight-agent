@@ -96,6 +96,8 @@ if (createPdfBtn) createPdfBtn.onclick = async () => {
     subStatus.innerHTML = `<p style="color:var(--color-success);font-size:13px;">✓ ${(json.reports || []).length} report(s) generated for <strong>${escapeHtml(audience)}</strong>.</p>`;
 
     // Download each report as PDF directly
+    let downloaded = 0;
+    const pdfErrors = [];
     for (const report of (json.reports || [])) {
       if (report.pdfUrl) {
         const a = document.createElement('a');
@@ -104,7 +106,16 @@ if (createPdfBtn) createPdfBtn.onclick = async () => {
         document.body.appendChild(a);
         a.click();
         document.body.removeChild(a);
+        downloaded += 1;
+      } else if (report.pdfError) {
+        pdfErrors.push(`${report.market}: ${report.pdfError}`);
       }
+    }
+
+    if (downloaded === 0) {
+      const details = pdfErrors.length ? `<br>${escapeHtml(pdfErrors.join(' | '))}` : '';
+      subStatus.innerHTML = `<p class="research-error">No PDF was generated.${details}</p>`;
+      return;
     }
 
     // Refresh the markdown preview

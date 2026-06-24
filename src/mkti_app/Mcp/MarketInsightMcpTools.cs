@@ -1105,14 +1105,8 @@ public sealed class MarketInsightMcpTools
         if (htmlContent is null)
             return JsonSerializer.Serialize(new { error = $"Report '{safeFilename}' not found" }, JsonOptions);
 
-        var webRoot = _environment.WebRootPath;
-        if (string.IsNullOrWhiteSpace(webRoot))
-            webRoot = Path.Combine(_environment.ContentRootPath, "wwwroot");
-        var tempDir = Path.Combine(webRoot, "temp");
-        Directory.CreateDirectory(tempDir);
-
         var pdfFilename = Path.ChangeExtension(safeFilename, ".pdf");
-        var pdfPath = Path.Combine(tempDir, pdfFilename);
+        byte[] pdfBytes;
 
         try
         {
@@ -1153,7 +1147,7 @@ public sealed class MarketInsightMcpTools
             });
             await using var page = await browser.NewPageAsync();
             await page.SetContentAsync(htmlContent, new SetContentOptions { WaitUntil = [WaitUntilNavigation.DOMContentLoaded] });
-            await page.PdfAsync(pdfPath, new PdfOptions
+            pdfBytes = await page.PdfDataAsync(new PdfOptions
             {
                 Format = PaperFormat.A4,
                 PrintBackground = true,
@@ -1165,10 +1159,28 @@ public sealed class MarketInsightMcpTools
             return JsonSerializer.Serialize(new { error = $"PDF generation failed: {ex.Message}" }, JsonOptions);
         }
 
+        await _blobStorageService.WriteBytesAsync(SubscriptionReportsContainer, pdfFilename, pdfBytes, "application/pdf");
+
+        // Best-effort local copy so local dev can still open /temp/*.pdf directly.
+        try
+        {
+            var webRoot = _environment.WebRootPath;
+            if (string.IsNullOrWhiteSpace(webRoot))
+                webRoot = Path.Combine(_environment.ContentRootPath, "wwwroot");
+            var tempDir = Path.Combine(webRoot, "temp");
+            Directory.CreateDirectory(tempDir);
+            var pdfPath = Path.Combine(tempDir, pdfFilename);
+            await File.WriteAllBytesAsync(pdfPath, pdfBytes);
+        }
+        catch
+        {
+            // Ignore local temp write failures in hosted environments.
+        }
+
         return JsonSerializer.Serialize(new
         {
             pdfFilename,
-            pdfUrl = $"/temp/{pdfFilename}",
+            pdfUrl = $"/api/subscription/pdf/{Uri.EscapeDataString(pdfFilename)}",
             success = true
         }, JsonOptions);
     }

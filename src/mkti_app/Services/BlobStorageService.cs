@@ -63,6 +63,30 @@ public sealed class BlobStorageService
         }
     }
 
+    public async Task WriteBytesAsync(string containerName, string blobName, byte[] content, string? contentType = null)
+    {
+        try
+        {
+            var container = _blobServiceClient.GetBlobContainerClient(containerName);
+            await container.CreateIfNotExistsAsync();
+            var blob = container.GetBlobClient(blobName);
+            using var stream = new MemoryStream(content);
+            var options = new Azure.Storage.Blobs.Models.BlobUploadOptions();
+            if (!string.IsNullOrWhiteSpace(contentType))
+            {
+                options.HttpHeaders = new Azure.Storage.Blobs.Models.BlobHttpHeaders { ContentType = contentType };
+            }
+            await blob.UploadAsync(stream, options);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Falling back to local storage for byte write to {Container}/{Blob}", Sanitize(containerName), Sanitize(blobName));
+            var fullPath = GetFallbackPath(containerName, blobName);
+            Directory.CreateDirectory(Path.GetDirectoryName(fullPath)!);
+            await File.WriteAllBytesAsync(fullPath, content);
+        }
+    }
+
     public async Task<byte[]?> ReadBytesAsync(string containerName, string blobName)
     {
         try

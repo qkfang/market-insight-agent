@@ -35,9 +35,30 @@
   </nav>
   <main class="app-main">
     <div class="panel">
-      <div class="panel-header">
+      <div class="section-heading">Ingest Single Article</div>
+      <div style="margin-bottom:16px;">
+        <label for="single-url">Article URL</label>
+        <input type="url" id="single-url" placeholder="https://example.com/news-article" style="width:100%;padding:7px 10px;border:1px solid var(--color-border);border-radius:var(--radius-md);font-size:13px;" />
+        <div style="display:flex;align-items:center;gap:8px;margin:10px 0;">
+          <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-weight:400;">
+            <input type="checkbox" id="single-use-text" /> Paste news text directly instead
+          </label>
+        </div>
+        <div id="single-text-area" hidden>
+          <label for="single-text">News Text</label>
+          <textarea id="single-text" rows="6" placeholder="Paste the full article text or HTML here…" style="width:100%;padding:7px 10px;border:1px solid var(--color-border);border-radius:var(--radius-md);font-size:13px;font-family:var(--font-mono);resize:vertical;"></textarea>
+        </div>
+        <label for="single-title">Title <span style="font-weight:400;color:var(--color-text-muted)">(optional — auto-detected from URL)</span></label>
+        <input type="text" id="single-title" placeholder="Article title" style="width:100%;padding:7px 10px;border:1px solid var(--color-border);border-radius:var(--radius-md);font-size:13px;" />
+        <div style="display:flex;align-items:center;gap:10px;margin-top:10px;">
+          <button class="action" id="single-ingest-btn">⬇ Ingest Article</button>
+          <span id="single-spinner" class="spinner" hidden></span>
+          <span id="single-result"></span>
+        </div>
+      </div>
+      <div class="panel-header" style="padding:0;border:0;margin-bottom:0;">
         <div>
-          <h2 class="panel-title">News Ingestion <span class="agent-hint"><a href="#">Agent Instructions</a><div class="agent-popup">You are a news ingestion agent for copper market. Ingest individual article JSON files from the data/articles/ folder and store each one unchanged in the news store.<br><br>Use the ingest_articles_json_to_news_store tool once per run, passing the dateFrom and dateTo parameters exactly as supplied in the user message.<br>The blob filename must be {yyyyMMddHHmmssfff}_{guid}.json, where the timestamp is derived from the article datetime in JSON and guid is from the JSON payload.<br>Do not download RSS feeds and do not transform article content into HTML.<br><br>Each analysis blob written to news-store looks like:<br>{ "id": "1", "guid": "3f3d8a16-...", "title": "Copper Price Forecast: ...", "publishDate": "Wed, 03 Jun 2026 09:47:00 +0000", "publishDateIso": "2026-06-03T09:47:00+00:00", "description": "...", "source": "FXEmpire", "domain": "fxempire.com", "originalUrl": "https://...", "htmlContent": "<!DOCTYPE html>..." }</div></span></h2>
+          <h2 class="panel-title">Bulk News Ingestion <span class="agent-hint"><a href="#">Agent Instructions</a><div class="agent-popup">You are a news ingestion agent for copper market. Ingest individual article JSON files from the data/articles/ folder and store each one unchanged in the news store.<br><br>Use the ingest_articles_json_to_news_store tool once per run, passing the dateFrom and dateTo parameters exactly as supplied in the user message.<br>The blob filename must be {yyyyMMddHHmmssfff}_{guid}.json, where the timestamp is derived from the article datetime in JSON and guid is from the JSON payload.<br>Do not download RSS feeds and do not transform article content into HTML.<br><br>Each analysis blob written to news-store looks like:<br>{ "id": "1", "guid": "3f3d8a16-...", "title": "Copper Price Forecast: ...", "publishDate": "Wed, 03 Jun 2026 09:47:00 +0000", "publishDateIso": "2026-06-03T09:47:00+00:00", "description": "...", "source": "FXEmpire", "domain": "fxempire.com", "originalUrl": "https://...", "htmlContent": "<!DOCTYPE html>..." }</div></span></h2>
           <p class="panel-desc">Download the latest copper market news from RSS feeds and store articles in Fabric Datalake and Azure Blob Storage.</p>
         </div>
       </div>

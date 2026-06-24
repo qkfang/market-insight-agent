@@ -9,6 +9,71 @@ const pre = document.getElementById('result');
 const refreshBtn = document.getElementById('ingest-refresh-btn');
 const cacheTimeEl = document.getElementById('ingest-cache-time');
 
+const singleIngestBtn = document.getElementById('single-ingest-btn');
+const singleSpinner = document.getElementById('single-spinner');
+const singleUrlInput = document.getElementById('single-url');
+const singleUseText = document.getElementById('single-use-text');
+const singleTextArea = document.getElementById('single-text-area');
+const singleText = document.getElementById('single-text');
+const singleTitle = document.getElementById('single-title');
+const singleResult = document.getElementById('single-result');
+
+singleUseText.addEventListener('change', () => {
+  singleTextArea.hidden = !singleUseText.checked;
+  singleUrlInput.disabled = singleUseText.checked;
+});
+
+singleIngestBtn.onclick = async () => {
+  const url = singleUrlInput.value.trim();
+  const text = singleText.value.trim();
+  const title = singleTitle.value.trim();
+  const useText = singleUseText.checked;
+
+  if (!useText && !url) {
+    singleResult.innerHTML = '<span class="status-badge error">Please enter a URL or paste text.</span>';
+    return;
+  }
+  if (useText && !text) {
+    singleResult.innerHTML = '<span class="status-badge error">Please paste article text.</span>';
+    return;
+  }
+
+  singleIngestBtn.disabled = true;
+  singleSpinner.hidden = false;
+  singleResult.innerHTML = '';
+
+  try {
+    const body = {};
+    if (!useText && url) body.url = url;
+    if (useText && text) body.text = text;
+    if (title) body.title = title;
+
+    const response = await fetch('/api/news/ingest/single', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body)
+    });
+
+    const json = await response.json();
+    if (!response.ok || json.error) {
+      singleResult.innerHTML = `<span class="status-badge error">Error: ${escapeHtml(json.error || 'Unknown error')}</span>`;
+    } else if (json.success) {
+      singleResult.innerHTML = `<span class="status-badge success">✓ Saved as ${escapeHtml(json.filename)}</span>`;
+      singleUrlInput.value = '';
+      singleText.value = '';
+      singleTitle.value = '';
+      await refreshCache();
+    } else {
+      singleResult.innerHTML = `<span class="status-badge error">Failed: ${escapeHtml(json.error || 'Unknown error')}</span>`;
+    }
+  } catch (e) {
+    singleResult.innerHTML = `<span class="status-badge error">Error: ${escapeHtml(e.message)}</span>`;
+  } finally {
+    singleIngestBtn.disabled = false;
+    singleSpinner.hidden = true;
+  }
+};
+
 function filterByDate(filenames) {
   const from = fromInput.value;
   const to = toInput.value;

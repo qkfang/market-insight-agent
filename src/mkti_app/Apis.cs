@@ -57,6 +57,102 @@ public static class Apis
             return Results.Json(new { success = true, filenames });
         });
 
+        app.MapPost("/api/news/ingest/single", async (SingleIngestRequest request, IWebHostEnvironment env, IHttpClientFactory httpClientFactory) =>
+        {
+            logger.LogInformation("/api/news/ingest/single called, url={Url}, hasText={HasText}", request.Url, !string.IsNullOrWhiteSpace(request.Text));
+
+            var url = request.Url?.Trim();
+            var pastedText = request.Text?.Trim();
+
+            if (string.IsNullOrWhiteSpace(url) && string.IsNullOrWhiteSpace(pastedText))
+                return Results.BadRequest(new { error = "Either url or text must be provided." });
+
+            string htmlContent;
+            string domain = "manual";
+            string source = "Manual";
+            string originalUrl = url ?? string.Empty;
+
+            if (!string.IsNullOrWhiteSpace(url))
+            {
+                if (!Uri.TryCreate(url, UriKind.Absolute, out var parsedUri) ||
+                    (parsedUri.Scheme != "http" && parsedUri.Scheme != "https"))
+                    return Results.BadRequest(new { error = "Invalid URL. Must be http or https." });
+
+                domain = parsedUri.Host;
+                source = parsedUri.Host.StartsWith("www.", StringComparison.OrdinalIgnoreCase)
+                    ? parsedUri.Host[4..]
+                    : parsedUri.Host;
+
+                try
+                {
+                    var client = httpClientFactory.CreateClient();
+                    client.Timeout = TimeSpan.FromSeconds(30);
+                    client.DefaultRequestHeaders.UserAgent.ParseAdd("Mozilla/5.0 (compatible; MarketInsightAgent/1.0)");
+                    htmlContent = await client.GetStringAsync(parsedUri);
+                }
+                catch (Exception ex)
+                {
+                    logger.LogWarning(ex, "Failed to fetch URL {Url}", url);
+                    return Results.Json(new { success = false, error = $"Failed to fetch URL: {ex.Message}" });
+                }
+            }
+            else
+            {
+                htmlContent = pastedText!;
+            }
+
+            var title = request.Title?.Trim();
+            if (string.IsNullOrWhiteSpace(title))
+            {
+                var titleMatch = System.Text.RegularExpressions.Regex.Match(
+                    htmlContent,
+                    @"<title[^>]*>\s*([^<]+)\s*</title>",
+                    System.Text.RegularExpressions.RegexOptions.IgnoreCase | System.Text.RegularExpressions.RegexOptions.Singleline);
+                title = titleMatch.Success
+                    ? System.Net.WebUtility.HtmlDecode(titleMatch.Groups[1].Value.Trim())
+                    : "Untitled Article";
+            }
+
+            var descMatch = System.Text.RegularExpressions.Regex.Match(
+                htmlContent,
+                @"<meta[^>]+name=[""']description[""'][^>]+content=[""']([^""']+)[""']",
+                System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+            var description = descMatch.Success
+                ? System.Net.WebUtility.HtmlDecode(descMatch.Groups[1].Value.Trim())
+                : title;
+
+            var now = DateTime.UtcNow;
+            var guid = Guid.NewGuid().ToString();
+            var publishDateIso = now.ToString("o");
+            var publishDate = now.ToString("ddd, dd MMM yyyy HH:mm:ss +0000", System.Globalization.CultureInfo.InvariantCulture);
+
+            var article = new
+            {
+                id = "1",
+                guid,
+                title,
+                publishDate,
+                publishDateIso,
+                description,
+                source,
+                domain,
+                originalUrl,
+                htmlContent
+            };
+
+            var articleJson = System.Text.Json.JsonSerializer.Serialize(article, new System.Text.Json.JsonSerializerOptions { WriteIndented = true });
+            var datePrefix = now.ToString("yyyy-MM-dd");
+            var filename = $"{datePrefix}_{guid}.json";
+
+            var articlesDir = Path.Combine(env.ContentRootPath, DataFolderName, ArticlesFolderName);
+            Directory.CreateDirectory(articlesDir);
+            await File.WriteAllTextAsync(Path.Combine(articlesDir, filename), articleJson, System.Text.Encoding.UTF8);
+
+            logger.LogInformation("/api/news/ingest/single saved article {Filename}", filename);
+
+            return Results.Json(new { success = true, filename, title, guid });
+        });
+
         app.MapGet("/api/articles/list", (string? from, string? to, IWebHostEnvironment env) =>
         {
             var articlesDir = Path.Combine(env.ContentRootPath, DataFolderName, ArticlesFolderName);
@@ -807,6 +903,8 @@ public static class Apis
     }
 
 }
+
+public sealed record SingleIngestRequest(string? Url, string? Text, string? Title);
 
 public sealed record SubscriptionGenerateRequest(
     IReadOnlyList<string>? Markets,

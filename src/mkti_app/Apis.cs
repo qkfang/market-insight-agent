@@ -10,6 +10,7 @@ public static class Apis
     private const string DataFolderName = "data";
     private const string ArticlesFolderName = "articles";
     private const string KnowledgeArticlesFileName = "articles.json";
+    private const string SubscriptionReportsContainer = "subscription-reports";
     private const int KnowledgeTopArticleCount = 3;
     private const int InsightPreviewMaxLength = 500;
 
@@ -539,6 +540,7 @@ public static class Apis
                 // Step 3: Generate PDF from the HTML report
                 string? pdfFilename = null;
                 string? pdfUrl = null;
+                string? pdfError = null;
                 if (!string.IsNullOrEmpty(filename))
                 {
                     var pdfJson = await mcpTools.GeneratePdfReport(filename);
@@ -546,7 +548,11 @@ public static class Apis
                     {
                         using var pdfDoc = System.Text.Json.JsonDocument.Parse(pdfJson);
                         var root = pdfDoc.RootElement;
-                        if (!root.TryGetProperty("error", out _))
+                        if (root.TryGetProperty("error", out var err))
+                        {
+                            pdfError = err.GetString();
+                        }
+                        else
                         {
                             if (root.TryGetProperty("pdfFilename", out var pfn)) pdfFilename = pfn.GetString();
                             if (root.TryGetProperty("pdfUrl", out var pu)) pdfUrl = pu.GetString();
@@ -563,7 +569,8 @@ public static class Apis
                     reportUrl = string.IsNullOrEmpty(filename) ? string.Empty : $"/api/subscription/report/{Uri.EscapeDataString(filename)}",
                     htmlBase64 = htmlBase64 ?? string.Empty,
                     pdfFilename = pdfFilename ?? string.Empty,
-                    pdfUrl = pdfUrl ?? string.Empty
+                    pdfUrl = pdfUrl ?? string.Empty,
+                    pdfError = pdfError ?? string.Empty
                 });
             }
 
@@ -580,11 +587,27 @@ public static class Apis
             if (string.IsNullOrEmpty(safeName) || safeName != filename)
                 return Results.BadRequest("Invalid filename");
 
-            var content = await blobStorageService.ReadTextAsync("subscription-reports", safeName);
+            var content = await blobStorageService.ReadTextAsync(SubscriptionReportsContainer, safeName);
             if (content is null)
                 return Results.NotFound();
 
             return Results.Content(content, "text/html; charset=utf-8");
+        });
+
+        app.MapGet("/api/subscription/pdf/{filename}", async (string filename) =>
+        {
+            if (string.IsNullOrWhiteSpace(filename))
+                return Results.BadRequest("filename is required");
+
+            var safeName = Path.GetFileName(filename);
+            if (string.IsNullOrEmpty(safeName) || safeName != filename)
+                return Results.BadRequest("Invalid filename");
+
+            var content = await blobStorageService.ReadBytesAsync(SubscriptionReportsContainer, safeName);
+            if (content is null)
+                return Results.NotFound();
+
+            return Results.File(content, "application/pdf", safeName);
         });
 
         // ── Blob-list cache GET (read from writable temp dir) ────────────────

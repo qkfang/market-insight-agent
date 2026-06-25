@@ -9,6 +9,10 @@ const pre = document.getElementById('result');
 const refreshBtn = document.getElementById('ingest-refresh-btn');
 const cacheTimeEl = document.getElementById('ingest-cache-time');
 
+// Default the "To" filter to today (local date) so the most recent stored articles are visible.
+const _today = new Date();
+toInput.value = `${_today.getFullYear()}-${String(_today.getMonth() + 1).padStart(2, '0')}-${String(_today.getDate()).padStart(2, '0')}`;
+
 const singleIngestBtn = document.getElementById('single-ingest-btn');
 const singleSpinner = document.getElementById('single-spinner');
 const singleUrlInput = document.getElementById('single-url');
@@ -74,23 +78,13 @@ singleIngestBtn.onclick = async () => {
   }
 };
 
-function filterByDate(filenames) {
-  const from = fromInput.value;
-  const to = toInput.value;
-  return filenames.filter(f => {
-    const prefix = f.slice(0, 10);
-    if (from && prefix < from) return false;
-    if (to && prefix > to) return false;
-    return true;
-  });
-}
-
 function renderFiles(filenames) {
   if (!filenames || filenames.length === 0) {
     filesEl.innerHTML = '<li>No articles stored yet.</li>';
     return;
   }
-  filesEl.innerHTML = filenames.map(f => `<li>${escapeHtml(f)}</li>`).join('');
+  const sorted = [...filenames].sort((a, b) => b.localeCompare(a));
+  filesEl.innerHTML = sorted.map(f => `<li>${escapeHtml(f)}</li>`).join('');
 }
 
 let cachedFilenames = [];
@@ -102,7 +96,7 @@ async function loadFromCache() {
     const json = await r.json();
     cachedFilenames = json.filenames || [];
     if (json.cachedAt) cacheTimeEl.textContent = `cached ${new Date(json.cachedAt).toLocaleString()}`;
-    renderFiles(filterByDate(cachedFilenames));
+    renderFiles(cachedFilenames);
   } catch {
     filesEl.innerHTML = '<li style="color:var(--color-text-muted)">No cache yet — click ↻ Refresh List to load.</li>';
     cachedFilenames = [];
@@ -118,7 +112,7 @@ async function refreshCache() {
     const json = await r.json();
     cachedFilenames = json.filenames || [];
     cacheTimeEl.textContent = `refreshed ${new Date().toLocaleString()}`;
-    renderFiles(filterByDate(cachedFilenames));
+    renderFiles(cachedFilenames);
   } catch (e) {
     filesEl.innerHTML = `<li style="color:var(--color-text-muted)">Refresh failed: ${escapeHtml(e.message)}</li>`;
   } finally {
@@ -128,8 +122,6 @@ async function refreshCache() {
 
 loadFromCache();
 
-fromInput.addEventListener('change', () => renderFiles(filterByDate(cachedFilenames)));
-toInput.addEventListener('change', () => renderFiles(filterByDate(cachedFilenames)));
 refreshBtn.onclick = refreshCache;
 
 btn.onclick = async () => {

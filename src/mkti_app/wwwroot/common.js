@@ -1,5 +1,24 @@
 // Shared helpers used across the physical pages.
 
+// Default all From/To date inputs to the current week (Monday–Sunday).
+document.addEventListener('DOMContentLoaded', () => {
+  const pad = n => String(n).padStart(2, '0');
+  const fmt = d => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+  const today = new Date();
+  const day = today.getDay(); // 0 = Sunday, 1 = Monday, ...
+  const diffToMonday = (day + 6) % 7; // days since most recent Monday
+  const monday = new Date(today);
+  monday.setDate(today.getDate() - diffToMonday);
+  const sunday = new Date(monday);
+  sunday.setDate(monday.getDate() + 6);
+  const weekStart = fmt(monday);
+  const weekEnd = fmt(sunday);
+  document.querySelectorAll('input[type="date"]').forEach(input => {
+    if (input.id.endsWith('-from')) input.value = weekStart;
+    else if (input.id.endsWith('-to')) input.value = weekEnd;
+  });
+});
+
 // Agent Instructions — click to open as a formatted modal
 document.addEventListener('DOMContentLoaded', () => {
   document.querySelectorAll('.agent-hint a').forEach(link => {

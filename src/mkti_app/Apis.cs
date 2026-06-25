@@ -65,7 +65,8 @@ public static class Apis
 
         app.MapGet("/api/news/list", async () =>
         {
-            var filenames = await blobStorageService.ListBlobNamesAsync("news-store");
+            var names = await blobStorageService.ListBlobNamesAsync("news-store");
+            var filenames = names.OrderByDescending(n => n, StringComparer.Ordinal).ToArray();
             return Results.Json(new { success = true, filenames });
         });
 
@@ -317,7 +318,8 @@ public static class Apis
 
         app.MapGet("/api/news/analysis", async () =>
         {
-            var names = await blobStorageService.ListBlobNamesAsync("news-analysis");
+            var names = (await blobStorageService.ListBlobNamesAsync("news-analysis"))
+                .OrderByDescending(n => n, StringComparer.Ordinal);
             var articles = new List<object>();
             foreach (var name in names)
             {
@@ -754,21 +756,16 @@ public static class Apis
 
             if (type == "ingest")
             {
-                var articlesDir = Path.Combine(env.ContentRootPath, DataFolderName, ArticlesFolderName);
-                string[] filenames = [];
-                if (Directory.Exists(articlesDir))
-                {
-                    filenames = Directory.GetFiles(articlesDir, "*.json", SearchOption.TopDirectoryOnly)
-                        .OrderBy(f => f)
-                        .Select(Path.GetFileName)
-                        .OfType<string>()
-                        .ToArray();
-                }
-                payload = new { filenames };
+                var names = await blobStorageService.ListBlobNamesAsync("news-store");
+                var filenames = names
+                    .OrderByDescending(n => n, StringComparer.Ordinal)
+                    .ToArray();
+                payload = new { filenames, cachedAt = DateTime.UtcNow.ToString("o") };
             }
             else if (type == "analyze")
             {
-                var names = await blobStorageService.ListBlobNamesAsync("news-analysis");
+                var names = (await blobStorageService.ListBlobNamesAsync("news-analysis"))
+                    .OrderByDescending(n => n, StringComparer.Ordinal);
                 var articles = new List<object>();
                 foreach (var name in names)
                 {

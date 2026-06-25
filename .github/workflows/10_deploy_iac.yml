@@ -8,9 +8,10 @@ on:
   workflow_dispatch:
   schedule:
     # GitHub Actions cron runs in UTC and does not observe daylight saving.
-    # 21:00 UTC = 7:00 AM Sydney during AEST (UTC+10).
-    # Note: during AEDT (UTC+11, Oct-Apr) this fires at 8:00 AM Sydney.
-    - cron: "0 21 * * *"
+    # Runs hourly from 7:00 AM to 6:00 PM Sydney during AEST (UTC+10).
+    # 7 AM Sydney = 21:00 UTC (prev day) ... 6 PM Sydney = 08:00 UTC.
+    # Note: during AEDT (UTC+11, Oct-Apr) the window shifts one hour later.
+    - cron: "0 21-23,0-8 * * *"
 
 permissions:
   contents: read

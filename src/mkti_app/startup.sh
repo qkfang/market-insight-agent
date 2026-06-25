@@ -6,8 +6,17 @@
 set -u
 
 echo "[startup] Installing Chromium native dependencies for PuppeteerSharp..."
-apt-get update -y \
-  && apt-get install -y --no-install-recommends \
+apt-get update -y || echo "[startup] WARNING: apt-get update failed."
+
+# libasound2 was renamed to libasound2t64 on newer images (e.g. Ubuntu 24.04
+# "noble"). Pick whichever the package index actually provides.
+if apt-cache show libasound2t64 > /dev/null 2>&1; then
+  ASOUND_PKG="libasound2t64"
+else
+  ASOUND_PKG="libasound2"
+fi
+
+apt-get install -y --no-install-recommends \
     libnss3 \
     libnspr4 \
     libatk1.0-0 \
@@ -22,7 +31,7 @@ apt-get update -y \
     libgbm1 \
     libpango-1.0-0 \
     libcairo2 \
-    libasound2 \
+    "$ASOUND_PKG" \
     libatspi2.0-0 \
     libgtk-3-0 \
     libx11-6 \

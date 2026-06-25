@@ -154,9 +154,24 @@ public static class Apis
             Directory.CreateDirectory(articlesDir);
             await File.WriteAllTextAsync(Path.Combine(articlesDir, filename), articleJson, System.Text.Encoding.UTF8);
 
+            // Also store directly into the news-store blob container (and Fabric Lakehouse),
+            // matching the {yyyyMMddHHmmssfff}_{guid}.json blob-name convention used by the bulk ingest.
+            var blobName = $"{now:yyyyMMddHHmmssfff}_{guid}.json";
+            try
+            {
+                await blobStorageService.WriteTextAsync("news-store", blobName, articleJson, "application/json");
+                await fabricLakehouseService.WriteFileAsync($"news-store/{blobName}", articleJson);
+                logger.LogInformation("/api/news/ingest/single stored article to news-store {BlobName}", blobName);
+            }
+            catch (Exception ex)
+            {
+                logger.LogWarning(ex, "/api/news/ingest/single failed to store article to news-store {BlobName}", blobName);
+                return Results.Json(new { success = false, error = $"Saved locally but failed to store to news-store: {ex.Message}", filename, title, guid });
+            }
+
             logger.LogInformation("/api/news/ingest/single saved article {Filename}", filename);
 
-            return Results.Json(new { success = true, filename, title, guid });
+            return Results.Json(new { success = true, filename, blobName, title, guid });
         });
 
         app.MapGet("/api/articles/list", (string? from, string? to, IWebHostEnvironment env) =>

@@ -35,6 +35,22 @@
   </nav>
   <main class="app-main">
     <div class="panel">
+      <div class="panel-header" style="padding:0;border:0;margin-bottom:0;">
+        <div>
+          <h2 class="panel-title">Bulk News Ingestion <span class="agent-hint"><a href="#">Agent Instructions</a><div class="agent-popup">You are a news ingestion agent for copper market. Ingest individual article JSON files from the data/articles/ folder and store each one unchanged in the news store.<br><br>Use the ingest_articles_json_to_news_store tool once per run, passing the dateFrom and dateTo parameters exactly as supplied in the user message.<br>The blob filename must be {yyyyMMddHHmmssfff}_{guid}.json, where the timestamp is derived from the article datetime in JSON and guid is from the JSON payload.<br>Do not download RSS feeds and do not transform article content into HTML.<br><br>Each analysis blob written to news-store looks like:<br>{ "id": "1", "guid": "3f3d8a16-...", "title": "Copper Price Forecast: ...", "publishDate": "Wed, 03 Jun 2026 09:47:00 +0000", "publishDateIso": "2026-06-03T09:47:00+00:00", "description": "...", "source": "FXEmpire", "domain": "fxempire.com", "originalUrl": "https://...", "htmlContent": "<!DOCTYPE html>..." }</div></span></h2>
+          <p class="panel-desc">Download the latest copper market news from RSS feeds and store articles in Fabric Datalake and Azure Blob Storage.</p>
+        </div>
+      </div>
+      <div class="action-bar">
+        <label for="ingest-from">From:</label>
+        <input type="date" id="ingest-from" value="2026-06-01" />
+        <label for="ingest-to">To:</label>
+        <input type="date" id="ingest-to" value="2026-06-07" />
+        <button class="action" id="ingest-btn">⬇ Ingest Now</button>
+        <span id="ingest-spinner" class="spinner" hidden></span>
+      </div>
+      <div id="ingest-meta"></div>
+      <div id="ingest-summary"></div>
       <div class="section-heading">Ingest Single Article</div>
       <div style="margin-bottom:16px;">
         <label for="single-url">Article URL</label>
@@ -56,22 +72,6 @@
           <span id="single-result"></span>
         </div>
       </div>
-      <div class="panel-header" style="padding:0;border:0;margin-bottom:0;">
-        <div>
-          <h2 class="panel-title">Bulk News Ingestion <span class="agent-hint"><a href="#">Agent Instructions</a><div class="agent-popup">You are a news ingestion agent for copper market. Ingest individual article JSON files from the data/articles/ folder and store each one unchanged in the news store.<br><br>Use the ingest_articles_json_to_news_store tool once per run, passing the dateFrom and dateTo parameters exactly as supplied in the user message.<br>The blob filename must be {yyyyMMddHHmmssfff}_{guid}.json, where the timestamp is derived from the article datetime in JSON and guid is from the JSON payload.<br>Do not download RSS feeds and do not transform article content into HTML.<br><br>Each analysis blob written to news-store looks like:<br>{ "id": "1", "guid": "3f3d8a16-...", "title": "Copper Price Forecast: ...", "publishDate": "Wed, 03 Jun 2026 09:47:00 +0000", "publishDateIso": "2026-06-03T09:47:00+00:00", "description": "...", "source": "FXEmpire", "domain": "fxempire.com", "originalUrl": "https://...", "htmlContent": "<!DOCTYPE html>..." }</div></span></h2>
-          <p class="panel-desc">Download the latest copper market news from RSS feeds and store articles in Fabric Datalake and Azure Blob Storage.</p>
-        </div>
-      </div>
-      <div class="action-bar">
-        <label for="ingest-from">From:</label>
-        <input type="date" id="ingest-from" value="2026-06-01" />
-        <label for="ingest-to">To:</label>
-        <input type="date" id="ingest-to" value="2026-06-07" />
-        <button class="action" id="ingest-btn">⬇ Ingest Now</button>
-        <span id="ingest-spinner" class="spinner" hidden></span>
-      </div>
-      <div id="ingest-meta"></div>
-      <div id="ingest-summary"></div>
       <div class="section-heading">Stored Articles</div>
       <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;">
         <button class="action" id="ingest-refresh-btn">↻ Refresh List</button>

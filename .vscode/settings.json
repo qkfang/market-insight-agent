@@ -7,7 +7,8 @@
         "~/.copilot/skills": true,
         "~/.claude/skills": true,
         "~/.vscode/extensions/synapsevscode.synapse-1.23.0/copilot/skills": true,
-        "~/.vscode/extensions/synapsevscode.synapse-1.24.0/copilot/skills": true
+        "~/.vscode/extensions/synapsevscode.synapse-1.24.0/copilot/skills": true,
+        "~/.vscode/extensions/synapsevscode.synapse-1.25.0/copilot/skills": true
     },
     "chat.tools.terminal.autoApprove": {
         "/^az deployment group show --name 'mkti-deploy' --resource-group 'rg-market-insight' --query 'properties\\.outputs' -o json$/": {
